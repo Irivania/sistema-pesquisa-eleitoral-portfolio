@@ -1,13 +1,22 @@
+import { useState, useEffect } from 'react';
 import { MapPin, AlertCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import {
-  BAIRROS, SEXOS, FAIXAS_ETARIAS, ESCOLARIDADES, AREAS, RODADAS_PESQUISA, RodadaId,
+  BAIRROS, SEXOS, FAIXAS_ETARIAS, ESCOLARIDADES, AREAS,
 } from '@/data/surveyOptions';
 
 const BAIRROS_COMUNS = ['Centro', 'Prados', 'São Sebastião', 'Santo Amaro', 'Bela Vista', 'Hulha'];
 
+interface RodadaItem {
+  id: string;
+  nome: string;
+  turno: string;
+  ativa: boolean;
+}
+
 interface StepClassificationProps {
   form: {
-    rodada?: RodadaId;
+    rodada?: string;
     bairro: string;
     sexo: string;
     faixa_etaria: string;
@@ -15,10 +24,34 @@ interface StepClassificationProps {
     area: string;
   };
   errors: Record<string, string>;
-  update: (field: string, value: string | RodadaId) => void;
+  update: (field: string, value: string) => void;
 }
 
 export default function StepClassification({ form, errors, update }: StepClassificationProps) {
+  const [rodadasAtivas, setRodadasAtivas] = useState<RodadaItem[]>([]);
+  const [loadingRodadas, setLoadingRodadas] = useState(true);
+
+  useEffect(() => {
+    async function fetchRodadasAtivas() {
+      const { data, error } = await supabase
+        .from('pesquisa_rodadas')
+        .select('id, nome, turno, ativa')
+        .eq('ativa', true)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setRodadasAtivas(data);
+        // Se houver rodadas ativas e nenhuma selecionada, define a primeira por padrão
+        if (data.length > 0 && !form.rodada) {
+          update('rodada', data[0].nome);
+        }
+      }
+      setLoadingRodadas(false);
+    }
+
+    fetchRodadasAtivas();
+  }, [form.rodada, update]);
+
   return (
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
@@ -30,15 +63,24 @@ export default function StepClassification({ form, errors, update }: StepClassif
         <label className="block text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1.5">
           Rodada Atual *
         </label>
-        <select
-          value={form.rodada || 'p1_1t'}
-          onChange={(e) => update('rodada', e.target.value as RodadaId)}
-          className="input-field bg-white text-sm font-medium border-blue-300"
-        >
-          {RODADAS_PESQUISA.map((r) => (
-            <option key={r.id} value={r.id}>{r.name}</option>
-          ))}
-        </select>
+        {loadingRodadas ? (
+          <p className="text-xs text-blue-600">Carregando rodadas ativas...</p>
+        ) : rodadasAtivas.length === 0 ? (
+          <p className="text-xs text-red-600">Nenhuma pesquisa/rodada ativa encontrada. Cadastre no Painel Master.</p>
+        ) : (
+          <select
+            value={form.rodada || ''}
+            onChange={(e) => update('rodada', e.target.value)}
+            className="input-field bg-white text-sm font-medium border-blue-300"
+          >
+            <option value="">Selecione a rodada da pesquisa...</option>
+            {rodadasAtivas.map((r) => (
+              <option key={r.id} value={r.nome}>
+                {r.nome} ({r.turno})
+              </option>
+            ))}
+          </select>
+        )}
         {errors.rodada && <FieldError msg={errors.rodada} />}
       </div>
 
@@ -67,6 +109,9 @@ export default function StepClassification({ form, errors, update }: StepClassif
           className="input-field"
         >
           <option value="">Ou selecione na lista completa de bairros...</option>
+          {form.bairro && !BAIRROS.includes(form.bairro) && (
+            <option value={form.bairro}>{form.bairro}</option>
+          )}
           {BAIRROS.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
         {errors.bairro && <FieldError msg={errors.bairro} />}

@@ -61,7 +61,7 @@ Navegador
 - O código-fonte da aplicação está em `src/`.
 - O build de produção é gerado em `dist/`.
 - Não há roteamento React; as telas são controladas pelo estado da aplicação.
-- Não há framework de testes automatizados configurado atualmente.
+- Não há framework de testes automatizados configurado atualmente; a validação disponível é feita por TypeScript, ESLint e build do Vite.
 
 ## 3. Estruturação do Banco de Dados
 
@@ -112,6 +112,12 @@ Armazena códigos de liberação individual de uso único:
 
 O administrador Master gera, copia e exclui códigos. O entrevistador valida um código disponível e, em seguida, ele é marcado como usado.
 
+### Tabela `pesquisa_rodadas`
+
+O frontend espera uma tabela para o cadastro das rodadas de coleta, com pelo menos os campos `id`, `nome`, `turno`, `data_inicio`, `data_fim`, `dias_duracao`, `ativa` e `created_at`. Ela é consultada pelo painel administrativo e pela etapa de classificação do formulário.
+
+Essa tabela ainda não possui uma migração neste repositório. Antes de usar o gerenciamento de pesquisas ou selecionar uma rodada no formulário, crie e aplique uma migração complementar no Supabase.
+
 ### Fluxo de dados
 
 1. O administrador configura a equipe e, quando necessário, uma liberação de horário.
@@ -124,9 +130,10 @@ O administrador Master gera, copia e exclui códigos. O entrevistador valida um 
 
 As migrações atuais liberam `SELECT`, `INSERT`, `UPDATE` e, em alguns casos, `DELETE` para `anon` e `authenticated`. A separação Master/Secundário é aplicada principalmente no frontend e não está representada por policies específicas no banco. Portanto, essa configuração deve ser considerada adequada apenas para ambiente controlado ou protótipo até que as policies sejam endurecidas.
 
-Há duas verificações importantes antes da implantação:
+Há três verificações importantes antes da implantação:
 
 - O frontend usa `surveys.rodada`, mas a migração inicial de `surveys` não declara essa coluna. Crie uma migração complementar ou ajuste o schema antes de usar filtros e comparativos por rodada.
+- O frontend consulta `pesquisa_rodadas`, mas não existe migração dessa tabela neste repositório. Crie a tabela com os campos usados por `RodadasManagementTab`, `AdminDashboard` e `StepClassification`.
 - O cadastro de administradores secundários consulta `invite_tokens`, mas não existe migração dessa tabela neste repositório. O fluxo de convite secundário exige que essa tabela e suas policies sejam criadas no Supabase.
 
 ## 4. Funcionalidades Principais
@@ -150,7 +157,7 @@ O acesso começa na tela de login, que lista apenas entrevistadores ativos. Apó
 3. **Candidatos:** Senado espontâneo e estimulado, com até duas escolhas, e rejeição para o Senado.
 4. **Perfil político:** deputado federal, deputado estadual, influência do apoio da prefeita, fator de escolha e veículo de comunicação.
 
-A primeira etapa possui validações para os campos de classificação. As respostas são enviadas ao Supabase ao clicar em **Salvar Questionário** e o formulário é preparado para a próxima entrevista.
+As quatro etapas possuem validações próprias. As respostas são enviadas ao Supabase ao clicar em **Salvar Questionário** e o formulário preserva bairro e rodada ao preparar a próxima entrevista.
 
 ### Painel Administrativo / Coordenador
 
@@ -210,6 +217,8 @@ npm run dev
 
 O Vite exibirá a URL local, normalmente `http://localhost:5173`.
 
+Se a porta padrão estiver ocupada, o Vite escolherá automaticamente outra porta disponível, como `http://localhost:5174`. Isso é um aviso do ambiente, não necessariamente uma falha da aplicação.
+
 ### Scripts disponíveis
 
 ```bash
@@ -222,7 +231,7 @@ npm run lint       # análise estática ESLint
 
 ### Simulação de dados
 
-O arquivo `simulate.js` realiza inserções sintéticas diretamente na tabela `surveys`, com 20 registros simultâneos por padrão. Ele não autentica usuários e pode poluir a base com dados falsos. Execute somente em um projeto Supabase de teste e revise as credenciais embutidas no arquivo antes de usar:
+O arquivo `simulate.js` realiza inserções sintéticas diretamente na tabela `surveys`, com 20 registros simultâneos por padrão. Ele usa URL e chave publicável configuradas diretamente no código, não lê o `.env`, não autentica usuários e pode poluir a base com dados falsos. Execute somente em um projeto Supabase de teste e revise a configuração antes de usar:
 
 ```bash
 node simulate.js
@@ -273,6 +282,7 @@ Cada push para a branch conectada pode gerar um novo build automaticamente. O re
 .
 ├── src/
 │   ├── components/       # Telas, abas, formulário e componentes visuais
+│   │   └── login/         # Seções de autenticação administrativa e entrevistador
 │   ├── data/             # Opções da pesquisa e meta de entrevistas
 │   ├── lib/              # Cliente Supabase e funções analíticas/exportação
 │   └── types/            # Tipos TypeScript do domínio
@@ -280,6 +290,7 @@ Cada push para a branch conectada pode gerar um novo build automaticamente. O re
 │   └── migrations/       # Schema, policies e índices do banco
 ├── index.html            # Documento HTML de entrada
 ├── simulate.js           # Inserção sintética para testes controlados
+├── LEIA-ME.md            # Guia resumido de execução e configuração
 ├── package.json          # Dependências e scripts
 ├── tailwind.config.js    # Configuração do Tailwind CSS
 ├── vite.config.ts        # Configuração do Vite e alias @
@@ -296,3 +307,5 @@ Cada push para a branch conectada pode gerar um novo build automaticamente. O re
 - A sessão do entrevistador é armazenada no `localStorage` e não usa Supabase Auth.
 - Entrevistas identificam o autor por texto em `interviewer_name`, sem vínculo com uma identidade autenticada.
 - O CSV é produzido no navegador e pode conter informações sensíveis.
+- A tabela `pesquisa_rodadas` é necessária para o fluxo de rodadas, mas ainda precisa ser criada por uma migração complementar.
+- O script `simulate.js` mantém sua configuração do Supabase no próprio arquivo e deve ser tratado como ferramenta exclusiva de teste.

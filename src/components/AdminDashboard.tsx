@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
-  BarChart3, Download, Printer, Filter, X,
+  BarChart3, Download, Printer,
   ClipboardList, TrendingUp, PieChart, Vote, Layers, UserCog, Shield, Award,
-  Users, MapPin, GitCompare,
+  Users, MapPin, GitCompare, CalendarDays,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { SurveyData, Session } from '@/types/survey';
@@ -17,13 +17,13 @@ import OpiniaoTab from '@/components/OpiniaoTab';
 import CandidatosTab from '@/components/CandidatosTab';
 import ComparisonTab from './ComparisonTab';
 import SurveysManagementTab from '@/components/SurveysManagementTab';
+import RodadasManagementTab from '@/components/RodadasManagementTab';
 import IndividualReportTab from '@/components/IndividualReportTab';
 import SurveyDetailModal from '@/components/SurveyDetailModal';
-import { KpiCard, FilterSelect } from '@/components/AdminWidgets';
-import {
-  BAIRROS, AREAS,
-  META_ENTREVISTAS, RODADAS_PESQUISA,
-} from '@/data/surveyOptions';
+import AdminFilters from '@/components/AdminFilters';
+import DeleteSurveyModal from '@/components/DeleteSurveyModal';
+import { KpiCard } from '@/components/AdminWidgets';
+import { META_ENTREVISTAS } from '@/data/surveyOptions';
 
 interface AdminDashboardProps {
   session: Session;
@@ -32,15 +32,22 @@ interface AdminDashboardProps {
 
 type FilterType = 'all' | string;
 
+interface RodadaItem {
+  id: string;
+  nome: string;
+  turno: string;
+  ativa: boolean;
+}
+
 export default function AdminDashboard({ session, onLogout }: AdminDashboardProps) {
   const adminName = session.name;
   const isMaster = session.role !== 'secondary';
 
   const [surveys, setSurveys] = useState<SurveyData[]>([]);
+  const [rodadas, setRodadas] = useState<RodadaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // Filtros
   const [filterRodada, setFilterRodada] = useState<FilterType>('all');
   const [filterBairro, setFilterBairro] = useState<FilterType>('all');
   const [filterArea, setFilterArea] = useState<FilterType>('all');
@@ -54,17 +61,20 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
 
   const [activeTab, setActiveTab] = useState<string>('overview');
 
-  const loadSurveys = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const { data, error } = await supabase
-        .from('surveys')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [surveysRes, rodadasRes] = await Promise.all([
+        supabase.from('surveys').select('*').order('created_at', { ascending: false }),
+        supabase.from('pesquisa_rodadas').select('*').order('created_at', { ascending: false })
+      ]);
 
-      if (error) throw error;
-      setSurveys((data || []) as SurveyData[]);
+      if (surveysRes.error) throw surveysRes.error;
+      if (rodadasRes.error) throw rodadasRes.error;
+
+      setSurveys((surveysRes.data || []) as SurveyData[]);
+      setRodadas((rodadasRes.data || []) as RodadaItem[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
     } finally {
@@ -73,8 +83,8 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
   }, []);
 
   useEffect(() => {
-    loadSurveys();
-  }, [loadSurveys]);
+    loadData();
+  }, [loadData]);
 
   const filtered = useMemo(() => {
     return surveys.filter((s) => {
@@ -88,7 +98,6 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
 
   const interviewers = useMemo(() => getUniqueInterviewers(surveys), [surveys]);
   const progressPct = surveys.length > 0 ? Math.min((surveys.length / META_ENTREVISTAS) * 100, 100) : 0;
-
   const hasActiveFilters = filterRodada !== 'all' || filterBairro !== 'all' || filterArea !== 'all' || filterInterviewer !== 'all';
 
   const clearFilters = () => {
@@ -128,7 +137,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
 
       setDeleteConfirm(null);
       setDeletePassword('');
-      await loadSurveys();
+      await loadData();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Erro ao excluir pesquisa');
     } finally {
@@ -136,11 +145,9 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => { window.print(); };
 
-  // Analytics baseados nos dados filtrados
+  // Analytics
   const bairroData = useMemo(() => toPercentages(countOccurrences(filtered, 'bairro')), [filtered]);
   const areaData = useMemo(() => toPercentages(countOccurrences(filtered, 'area')), [filtered]);
   const sexoData = useMemo(() => toPercentages(countOccurrences(filtered, 'sexo')), [filtered]);
@@ -214,6 +221,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
     { id: 'relatorio', label: 'Relatório Individual', icon: Award },
     ...(isMaster
       ? [
+          { id: 'rodadas', label: 'Gerenciar Pesquisas', icon: CalendarDays },
           { id: 'entrevistadores', label: 'Gerenciar Equipe', icon: UserCog },
           { id: 'acessos', label: 'Controle de Acessos', icon: Shield },
         ]
@@ -251,12 +259,6 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <div className="hidden print-only mb-6">
-          <h1 className="text-2xl font-bold">Levantamento Interno de Opinião — Bezerros/PE</h1>
-          <p className="text-gray-600">Setembro 2026 — Relatório de Apuração</p>
-          <p className="text-gray-500 text-sm">Gerado em: {new Date().toLocaleDateString('pt-BR')}</p>
-        </div>
-
         {/* Progress + KPIs */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
           <div className="card p-5 lg:col-span-2">
@@ -284,47 +286,21 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
           <KpiCard icon={MapPin} label="Bairros Cobertos" value={bairroData.length} color="amber" />
         </div>
 
-        {/* Filters + Rodada Selector */}
-        <div className="card p-4 mb-6 no-print">
-          <div className="flex items-center gap-2 mb-3">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-semibold text-gray-700">Filtros e Seleção de Pesquisa</span>
-            {hasActiveFilters && (
-              <button onClick={clearFilters} className="ml-auto text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                <X className="w-3 h-3" /> Limpar filtros
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Pesquisa / Rodada</label>
-              <div className="relative">
-                <select
-                  value={filterRodada}
-                  onChange={(e) => setFilterRodada(e.target.value)}
-                  className="input-field appearance-none pr-8 text-sm bg-blue-50/40 font-medium text-blue-900"
-                >
-                  <option value="all">Todas as Pesquisas (Geral)</option>
-                  {RODADAS_PESQUISA.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Bairro / Localidade</label>
-              <FilterSelect value={filterBairro} onChange={setFilterBairro} options={BAIRROS} allLabel="Todos os bairros" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Área</label>
-              <FilterSelect value={filterArea} onChange={setFilterArea} options={AREAS} allLabel="Todas as áreas" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Entrevistador</label>
-              <FilterSelect value={filterInterviewer} onChange={setFilterInterviewer} options={interviewers} allLabel="Todos os entrevistadores" />
-            </div>
-          </div>
-        </div>
+        {/* Componente de Filtros isolado */}
+        <AdminFilters
+          filterRodada={filterRodada}
+          setFilterRodada={setFilterRodada}
+          filterBairro={filterBairro}
+          setFilterBairro={setFilterBairro}
+          filterArea={filterArea}
+          setFilterArea={setFilterArea}
+          filterInterviewer={filterInterviewer}
+          setFilterInterviewer={setFilterInterviewer}
+          rodadas={rodadas}
+          interviewers={interviewers}
+          hasActiveFilters={hasActiveFilters}
+          clearFilters={clearFilters}
+        />
 
         {error && (
           <div className="card p-4 mb-6 border-red-200 bg-red-50">
@@ -357,7 +333,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
             <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
             <p className="text-gray-500">Carregando dados...</p>
           </div>
-        ) : filtered.length === 0 && activeTab !== 'entrevistadores' && activeTab !== 'acessos' ? (
+        ) : filtered.length === 0 && activeTab !== 'entrevistadores' && activeTab !== 'acessos' && activeTab !== 'rodadas' ? (
           <div className="card p-12 text-center">
             <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 font-medium">Nenhuma entrevista encontrada com os filtros selecionados</p>
@@ -418,6 +394,10 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
               />
             )}
 
+            {activeTab === 'rodadas' && isMaster && (
+              <RodadasManagementTab />
+            )}
+
             {activeTab === 'entrevistadores' && isMaster && (
               <InterviewerManagement adminName={adminName} />
             )}
@@ -429,59 +409,22 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
         )}
       </div>
 
-      {/* Detail Modal Modularizado */}
+      {/* Detail Modal */}
       {detailRow && (
         <SurveyDetailModal detailRow={detailRow} onClose={() => setDetailRow(null)} />
       )}
 
-      {/* Delete Confirmation with Password */}
+      {/* Componente de Modal de Exclusão isolado */}
       {deleteConfirm && isMaster && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setDeleteConfirm(null)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl mb-4">
-              <div className="text-amber-600 font-bold text-lg">⚠️</div>
-              <div>
-                <h3 className="font-bold text-amber-900 text-sm">Cuidado: Ação Irreversível</h3>
-                <p className="text-xs text-amber-700">Você está prestes a excluir permanentemente esta entrevista.</p>
-              </div>
-            </div>
-
-            <p className="text-gray-600 text-sm mb-4">
-              Entrevista de <strong>{deleteConfirm.interviewer_name}</strong> no bairro <strong>{deleteConfirm.bairro}</strong>.
-            </p>
-
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Digite sua senha de Administrador Master para confirmar:
-              </label>
-              <input
-                type="password"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-                placeholder="Sua senha..."
-                className="input-field text-sm"
-                autoFocus
-              />
-              {deleteError && <p className="text-xs text-red-600 mt-1">{deleteError}</p>}
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => { setDeleteConfirm(null); setDeletePassword(''); setDeleteError(''); }}
-                className="btn-secondary text-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDeleteWithPassword}
-                disabled={deleting}
-                className="px-4 py-2 bg-red-600 text-white font-medium text-sm rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-              >
-                {deleting ? 'Excluindo...' : 'Confirmar Exclusão'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteSurveyModal
+          deleteConfirm={deleteConfirm}
+          deletePassword={deletePassword}
+          setDeletePassword={setDeletePassword}
+          deleteError={deleteError}
+          deleting={deleting}
+          onClose={() => { setDeleteConfirm(null); setDeletePassword(''); setDeleteError(''); }}
+          onConfirm={handleDeleteWithPassword}
+        />
       )}
     </div>
   );

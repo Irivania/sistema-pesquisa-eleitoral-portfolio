@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Check, ChevronRight, ChevronLeft, Save, CheckCircle2,
   AlertCircle, RotateCcw, MapPin, Vote, TrendingUp, Newspaper,
@@ -47,14 +47,14 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const update = (field: string, value: string | string[] | RodadaId | undefined) => {
+  const update = useCallback((field: string, value: string | string[] | RodadaId | undefined) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => {
       const next = { ...prev };
       delete next[field];
       return next;
     });
-  };
+  }, []);
 
   const toggleArrayItem = (field: 'senado_espontanea' | 'senado_estimulada', item: string, max: number) => {
     setForm((prev) => {
@@ -65,16 +65,20 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
       if (current.length >= max) return prev;
       return { ...prev, [field]: [...current, item] };
     });
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
   };
 
-  // Validação flexível e segura por etapa
   const validateStep = (): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (step === 0) {
       if (!form.rodada) newErrors.rodada = 'Selecione a rodada';
-      if (!form.bairro) newErrors.bairro = 'Selecione o bairro';
-      if (!form.sexo) newErrors.sexo = 'Selecione o sexo';
+      if (!form.bairro) newErrors.bairro = 'Selecione o bairro ou localidade';
+      if (!form.sexo) newErrors.sexo = 'Selecione o sexo/gênero';
       if (!form.faixa_etaria) newErrors.faixa_etaria = 'Selecione a faixa etária';
       if (!form.escolaridade) newErrors.escolaridade = 'Selecione a escolaridade';
       if (!form.area) newErrors.area = 'Selecione a área';
@@ -83,11 +87,25 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
       if (!form.aval_governadora) newErrors.aval_governadora = 'Informe a avaliação da governadora';
       if (!form.problema_principal) newErrors.problema_principal = 'Informe o problema principal';
     } else if (step === 2) {
-      // Etapa 3 (índice 2): Candidatos - Mantida flexível para permitir avanço sem travar seleções opcionais
-      // Caso queira exigir algum campo específico aqui no futuro, basta adicionar a regra abaixo.
+      const espontanea = form.senado_espontanea || [];
+      if (espontanea.length !== 2) {
+        newErrors.senado_espontanea = `Selecione exatamente 2 opções (${espontanea.length}/2)`;
+      }
+
+      const estimulada = form.senado_estimulada || [];
+      if (estimulada.length !== 2) {
+        newErrors.senado_estimulada = `Selecione exatamente 2 opções (${estimulada.length}/2)`;
+      }
+
+      if (!form.rejeicao_senado) {
+        newErrors.rejeicao_senado = 'Selecione a opção de rejeição para o Senado';
+      }
     } else if (step === 3) {
-      if (!form.influencia_apoio) newErrors.influencia_apoio = 'Responda sobre a influência';
+      if (!form.dep_federal) newErrors.dep_federal = 'Informe o candidato a deputado federal';
+      if (!form.dep_estadual) newErrors.dep_estadual = 'Informe o candidato a deputado estadual';
+      if (!form.influencia_apoio) newErrors.influencia_apoio = 'Responda sobre a influência do apoio';
       if (!form.peso_escolha) newErrors.peso_escolha = 'Responda sobre o peso da escolha';
+      if (!form.veiculo_comunicacao) newErrors.veiculo_comunicacao = 'Informe o principal veículo de comunicação';
     }
 
     setErrors(newErrors);
@@ -135,7 +153,6 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Stepper Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
           {stepLabels.map((label, i) => {
@@ -168,9 +185,9 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
       ) : (
         <div className="card p-6 sm:p-8 animate-fade-in">
           {step === 0 && <StepClassification form={form} errors={errors} update={update} />}
-          {step === 1 && <StepOpinion form={form} update={update} />}
-          {step === 2 && <StepCandidates form={form} update={update} toggleArrayItem={toggleArrayItem} />}
-          {step === 3 && <StepProfile form={form} update={update} />}
+          {step === 1 && <StepOpinion form={form} errors={errors} update={update} />}
+          {step === 2 && <StepCandidates form={form} errors={errors} update={update} toggleArrayItem={toggleArrayItem} />}
+          {step === 3 && <StepProfile form={form} errors={errors} update={update} />}
 
           {errors.submit && (
             <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 flex items-center gap-2">

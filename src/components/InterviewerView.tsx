@@ -33,7 +33,6 @@ function formatCurrentTime(): string {
 export default function InterviewerView({ name, onLogout }: InterviewerViewProps) {
   const [myCount, setMyCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [overrideActive, setOverrideActive] = useState(false);
   const [showCodeInput, setShowCodeInput] = useState(false);
@@ -72,7 +71,6 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
 
       if (data) {
         const s = data as AppSettings;
-        setSettings(s);
         // Check if override is active and not expired
         if (s.override_active) {
           if (s.override_expires_at) {

@@ -1,4 +1,4 @@
-import { Vote } from 'lucide-react';
+import { Vote, AlertCircle } from 'lucide-react';
 import { CANDIDATOS_SENADO } from '@/data/surveyOptions';
 
 interface StepCandidatesProps {
@@ -7,11 +7,12 @@ interface StepCandidatesProps {
     senado_estimulada: string[];
     rejeicao_senado: string;
   };
+  errors: Record<string, string>;
   update: (field: string, value: string) => void;
   toggleArrayItem: (field: 'senado_espontanea' | 'senado_estimulada', item: string, max: number) => void;
 }
 
-export default function StepCandidates({ form, update, toggleArrayItem }: StepCandidatesProps) {
+export default function StepCandidates({ form, errors, update, toggleArrayItem }: StepCandidatesProps) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
@@ -19,20 +20,23 @@ export default function StepCandidates({ form, update, toggleArrayItem }: StepCa
         <h2 className="text-gray-900 font-semibold">Intenções de Voto</h2>
       </div>
 
-      <QuestionBlock number="4" title="Senado — espontânea (até 2 escolhas)">
+      <QuestionBlock number="4" title="Senado — espontânea (Selecione exatamente 2 escolhas)">
         <MultiChoice options={CANDIDATOS_SENADO} selected={form.senado_espontanea || []} onToggle={(item) => toggleArrayItem('senado_espontanea', item, 2)} max={2} />
+        {errors.senado_espontanea && <FieldError msg={errors.senado_espontanea} />}
       </QuestionBlock>
 
-      <QuestionBlock number="5" title="Senado — estimulada (até 2 escolhas)">
+      <QuestionBlock number="5" title="Senado — estimulada (Selecione exatamente 2 escolhas)">
         <MultiChoice options={CANDIDATOS_SENADO} selected={form.senado_estimulada || []} onToggle={(item) => toggleArrayItem('senado_estimulada', item, 2)} max={2} />
+        {errors.senado_estimulada && <FieldError msg={errors.senado_estimulada} />}
       </QuestionBlock>
 
-      <QuestionBlock number="6" title="Rejeição para o Senado (única escolha)">
+      <QuestionBlock number="6" title="Rejeição para o Senado (Única escolha)">
         <div className="flex flex-wrap gap-2">
           {CANDIDATOS_SENADO.map((c) => (
             <Chip key={c} label={c} selected={form.rejeicao_senado === c} onClick={() => update('rejeicao_senado', c)} />
           ))}
         </div>
+        {errors.rejeicao_senado && <FieldError msg={errors.rejeicao_senado} />}
       </QuestionBlock>
     </div>
   );
@@ -47,6 +51,14 @@ function QuestionBlock({ number, title, children }: { number: string; title: str
       </div>
       <div className="ml-8">{children}</div>
     </div>
+  );
+}
+
+function FieldError({ msg }: { msg: string }) {
+  return (
+    <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+      <AlertCircle className="w-3.5 h-3.5" /> {msg}
+    </p>
   );
 }
 
