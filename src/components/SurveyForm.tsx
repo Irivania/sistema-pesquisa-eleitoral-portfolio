@@ -67,8 +67,10 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
     });
   };
 
+  // Validação flexível e segura por etapa
   const validateStep = (): boolean => {
     const newErrors: Record<string, string> = {};
+
     if (step === 0) {
       if (!form.rodada) newErrors.rodada = 'Selecione a rodada';
       if (!form.bairro) newErrors.bairro = 'Selecione o bairro';
@@ -76,15 +78,37 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
       if (!form.faixa_etaria) newErrors.faixa_etaria = 'Selecione a faixa etária';
       if (!form.escolaridade) newErrors.escolaridade = 'Selecione a escolaridade';
       if (!form.area) newErrors.area = 'Selecione a área';
+    } else if (step === 1) {
+      if (!form.aval_prefeta) newErrors.aval_prefeta = 'Informe a avaliação da prefeita';
+      if (!form.aval_governadora) newErrors.aval_governadora = 'Informe a avaliação da governadora';
+      if (!form.problema_principal) newErrors.problema_principal = 'Informe o problema principal';
+    } else if (step === 2) {
+      // Etapa 3 (índice 2): Candidatos - Mantida flexível para permitir avanço sem travar seleções opcionais
+      // Caso queira exigir algum campo específico aqui no futuro, basta adicionar a regra abaixo.
+    } else if (step === 3) {
+      if (!form.influencia_apoio) newErrors.influencia_apoio = 'Responda sobre a influência';
+      if (!form.peso_escolha) newErrors.peso_escolha = 'Responda sobre o peso da escolha';
     }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const nextStep = () => { if (validateStep()) setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1)); };
-  const prevStep = () => setStep((s) => Math.max(s - 1, 0));
+  const nextStep = () => { 
+    if (validateStep()) {
+      setErrors({});
+      setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1)); 
+    }
+  };
+
+  const prevStep = () => {
+    setErrors({});
+    setStep((s) => Math.max(s - 1, 0));
+  };
 
   const handleSave = async () => {
+    if (!validateStep()) return;
+
     setSaving(true);
     setErrors({});
     try {
