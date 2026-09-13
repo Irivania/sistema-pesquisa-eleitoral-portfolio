@@ -64,7 +64,7 @@ export default function AccessControl({ adminName }: AccessControlProps) {
       if (codesRes.error) throw codesRes.error;
 
       setSettings(settingsRes.data as AppSettings | null);
-      setCodes((codesRes.data || []) as ExceptionCode[]);
+      setCodes((codesRes.data || []) as unknown as ExceptionCode[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar configurações');
     }

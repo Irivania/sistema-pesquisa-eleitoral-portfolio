@@ -64,7 +64,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSurveys((data || []) as SurveyData[]);
+      setSurveys((data || []) as unknown as SurveyData[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
     } finally {

@@ -33,7 +33,6 @@ function formatCurrentTime(): string {
 export default function InterviewerView({ name, onLogout }: InterviewerViewProps) {
   const [myCount, setMyCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [overrideActive, setOverrideActive] = useState(false);
   const [showCodeInput, setShowCodeInput] = useState(false);
@@ -71,8 +70,7 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
       if (error) throw error;
 
       if (data) {
-        const s = data as AppSettings;
-        setSettings(s);
+        const s = data as unknown as AppSettings;
         // Check if override is active and not expired
         if (s.override_active) {
           if (s.override_expires_at) {
@@ -141,7 +139,7 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
       const { error: updateError } = await supabase
         .from('exception_codes')
         .update({ used: true, used_at: new Date().toISOString() })
-        .eq('id', data.id);
+        .eq('id', (data as Record<string, unknown>).id);
 
       if (updateError) throw updateError;
 

@@ -1,6 +1,5 @@
 import { neon, neonConfig } from '@neondatabase/serverless';
 
-neonConfig.fetchConnectionCache = true;
 neonConfig.disableWarningInBrowsers = true;
 
 const connectionString = import.meta.env.VITE_NEON_DATABASE_URL;
@@ -10,6 +9,44 @@ if (!connectionString) {
 }
 
 export const sql = neon(connectionString);
+
+type AuthUser = {
+  email?: string;
+  user_metadata?: { name?: string; role?: 'master' | 'secondary' };
+};
+
+type DatabaseError = Error & { code?: string };
+
+type QueryResult = {
+  data: Record<string, unknown>[] | Record<string, unknown> | null;
+  error: DatabaseError | null;
+  count?: number | null;
+};
+
+type QueryBuilder = {
+  eq: (column: string, value: unknown) => QueryBuilder;
+  order: (column?: string, options?: { ascending?: boolean }) => Promise<QueryResult>;
+  maybeSingle: () => Promise<QueryResult>;
+  single: () => Promise<QueryResult>;
+  then: <T>(onfulfilled: (value: QueryResult) => T | PromiseLike<T>) => PromiseLike<T>;
+};
+
+type SupabaseCompat = {
+  auth: {
+    getSession: () => Promise<{ data: { session: { user: AuthUser } | null }; error: DatabaseError | null }>;
+    getUser: () => Promise<{ data: { user: AuthUser | null }; error: DatabaseError | null }>;
+    onAuthStateChange: (callback: (event: string, session: { user: AuthUser } | null) => void) => { data: { subscription: { unsubscribe: () => void } } };
+    signOut: () => Promise<{ error: DatabaseError | null }>;
+    signInWithPassword: (credentials: { email: string; password: string }) => Promise<{ data: { user: AuthUser | null }; error: DatabaseError | null }>;
+    signUp: (credentials: { email: string; password: string; options?: { data?: Record<string, unknown> } }) => Promise<{ data: { user: AuthUser | null }; error: DatabaseError | null }>;
+  };
+  from: (table: string) => {
+    select: (columns?: string, options?: { count?: string; head?: boolean }) => QueryBuilder;
+    insert: (values: Record<string, unknown>[]) => Promise<QueryResult>;
+    update: (values: Record<string, unknown>) => { eq: (column: string, value: unknown) => Promise<{ error: DatabaseError | null }> };
+    delete: () => { eq: (column: string, value: unknown) => Promise<{ error: DatabaseError | null }> };
+  };
+};
 
 export const supabase = {
   auth: {
@@ -32,8 +69,11 @@ export const supabase = {
     signOut: async () => {
       return { error: null };
     },
-    signInWithPassword: async () => {
-      return { data: { user: { email: 'admin@portifolio.com' } }, error: null };
+    signInWithPassword: async (credentials: { email: string; password: string }) => {
+      return { data: { user: { email: credentials.email } }, error: null };
+    },
+    signUp: async (credentials: { email: string; password: string; options?: { data?: Record<string, unknown> } }) => {
+      return { data: { user: { email: credentials.email } }, error: null };
     }
   },
   from: (table?: string) => ({
@@ -160,4 +200,4 @@ export const supabase = {
       }
     })
   })
-};
+} as unknown as SupabaseCompat;

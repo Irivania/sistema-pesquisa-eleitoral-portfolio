@@ -146,9 +146,9 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
       ) : (
         <div className="card p-6 sm:p-8 animate-fade-in">
           {step === 0 && <StepClassification form={form} errors={errors} update={update} />}
-          {step === 1 && <StepOpinion form={form} update={update} />}
+          {step === 1 && <StepOpinion form={form} errors={errors} update={update} />}
           {step === 2 && <StepCandidates form={form} update={update} toggleArrayItem={toggleArrayItem} />}
-          {step === 3 && <StepProfile form={form} update={update} />}
+          {step === 3 && <StepProfile form={form} errors={errors} update={update} />}
 
           {errors.submit && (
             <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 flex items-center gap-2">

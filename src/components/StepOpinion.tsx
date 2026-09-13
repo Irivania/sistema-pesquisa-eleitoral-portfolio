@@ -1,4 +1,4 @@
-import { Vote } from 'lucide-react';
+import { Vote, AlertCircle } from 'lucide-react';
 import { AVALIACOES, PROBLEMAS } from '@/data/surveyOptions';
 
 interface StepOpinionProps {
@@ -8,10 +8,11 @@ interface StepOpinionProps {
     problema_principal: string;
     problema_principal_outro?: string;
   };
+  errors: Record<string, string>;
   update: (field: string, value: string) => void;
 }
 
-export default function StepOpinion({ form, update }: StepOpinionProps) {
+export default function StepOpinion({ form, errors, update }: StepOpinionProps) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
@@ -25,6 +26,7 @@ export default function StepOpinion({ form, update }: StepOpinionProps) {
             <Chip key={a} label={a} selected={form.aval_prefeta === a} onClick={() => update('aval_prefeta', a)} color={ratingColor(a)} />
           ))}
         </div>
+        {errors.aval_prefeta && <FieldError msg={errors.aval_prefeta} />}
       </QuestionBlock>
 
       <QuestionBlock number="2" title="Avaliação da governadora Raquel Lyra">
@@ -33,6 +35,7 @@ export default function StepOpinion({ form, update }: StepOpinionProps) {
             <Chip key={a} label={a} selected={form.aval_governadora === a} onClick={() => update('aval_governadora', a)} color={ratingColor(a)} />
           ))}
         </div>
+        {errors.aval_governadora && <FieldError msg={errors.aval_governadora} />}
       </QuestionBlock>
 
       <QuestionBlock number="3" title="Principal problema de Bezerros (espontânea)">
@@ -50,6 +53,7 @@ export default function StepOpinion({ form, update }: StepOpinionProps) {
             className="input-field mt-3"
           />
         )}
+        {errors.problema_principal && <FieldError msg={errors.problema_principal} />}
       </QuestionBlock>
     </div>
   );
@@ -64,6 +68,14 @@ function QuestionBlock({ number, title, children }: { number: string; title: str
       </div>
       <div className="ml-8">{children}</div>
     </div>
+  );
+}
+
+function FieldError({ msg }: { msg: string }) {
+  return (
+    <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+      <AlertCircle className="w-3.5 h-3.5" /> {msg}
+    </p>
   );
 }
 

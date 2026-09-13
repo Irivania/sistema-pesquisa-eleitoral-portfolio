@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  UserPlus, Trash2, Search, AlertCircle, UserCheck, UserX,
-  User, X, Hash, ChevronDown, ChevronUp, Filter,
-} from 'lucide-react';
+import { UserPlus, Search, AlertCircle, Filter, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Interviewer } from '@/types/survey';
-import { formatDate } from '@/lib/analytics';
+import InterviewerTable from './interviewers/InterviewerTable';
+import InterviewerFormModal from './interviewers/InterviewerFormModal';
+import InterviewerDeleteModal from './interviewers/InterviewerDeleteModal';
 
 interface InterviewerManagementProps {
   adminName: string;
@@ -20,12 +19,17 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingInterviewer, setEditingInterviewer] = useState<Interviewer | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Interviewer | null>(null);
+
   const [newName, setNewName] = useState('');
   const [newCode, setNewCode] = useState('');
   const [newPhone, setNewPhone] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<Interviewer | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -40,7 +44,7 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
         .select('*')
         .order('name', { ascending: true });
       if (error) throw error;
-      setInterviewers((data || []) as Interviewer[]);
+      setInterviewers((data || []) as unknown as Interviewer[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar entrevistadores');
     } finally {
@@ -61,7 +65,15 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
     return code;
   };
 
-  const handleAdd = async () => {
+  const handleCopyLink = (intv: Interviewer) => {
+    const baseUrl = window.location.origin;
+    const link = `${baseUrl}/?profile=entrevistador&entrevistador=${encodeURIComponent(intv.id)}`;
+    navigator.clipboard.writeText(link);
+    setCopiedId(intv.id);
+    setTimeout(() => setCopiedId(null), 2500);
+  };
+
+  const handleSave = async () => {
     if (!newName.trim()) {
       setError('Informe o nome do entrevistador.');
       return;
@@ -71,33 +83,55 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
       return;
     }
 
-    setAdding(true);
+    setProcessing(true);
     setError('');
     try {
-      const { error } = await supabase.from('interviewers').insert([{
-        name: newName.trim(),
-        code: newCode.trim().toUpperCase(),
-        phone: newPhone.trim() || null,
-        created_by: adminName,
-      }]);
-      if (error) {
-        if (error.code === '23505') {
-          setError('Já existe um entrevistador com este código. Use um código diferente.');
-        } else {
+      if (editingInterviewer) {
+        const { error } = await supabase
+          .from('interviewers')
+          .update({
+            name: newName.trim(),
+            code: newCode.trim().toUpperCase(),
+            phone: newPhone.trim() || null,
+          })
+          .eq('id', editingInterviewer.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('interviewers').insert([{
+          name: newName.trim(),
+          code: newCode.trim().toUpperCase(),
+          phone: newPhone.trim() || null,
+          created_by: adminName,
+        }]);
+        if (error) {
+          if (error.code === '23505') {
+            setError('Já existe um entrevistador com este código. Use um código diferente.');
+            setProcessing(false);
+            return;
+          }
           throw error;
         }
-        return;
       }
+
       setNewName('');
       setNewCode('');
       setNewPhone('');
       setShowAddForm(false);
+      setEditingInterviewer(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao cadastrar');
+      setError(err instanceof Error ? err.message : 'Erro ao salvar dados');
     } finally {
-      setAdding(false);
+      setProcessing(false);
     }
+  };
+
+  const openEditModal = (intv: Interviewer) => {
+    setEditingInterviewer(intv);
+    setNewName(intv.name);
+    setNewCode(intv.code || '');
+    setNewPhone(intv.phone || '');
+    setError('');
   };
 
   const handleToggleActive = async (intv: Interviewer) => {
@@ -109,7 +143,7 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
       if (error) throw error;
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao atualizar');
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar status');
     }
   };
 
@@ -120,7 +154,7 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
       setDeleteConfirm(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao excluir');
+      setError(err instanceof Error ? err.message : 'Erro ao excluir entrevistador');
     }
   };
 
@@ -162,13 +196,6 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
   const activeCount = interviewers.filter((i) => i.is_active).length;
   const inactiveCount = interviewers.length - activeCount;
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ChevronDown className="w-3 h-3 opacity-0" />;
-    return sortDir === 'asc'
-      ? <ChevronUp className="w-3 h-3" />
-      : <ChevronDown className="w-3 h-3" />;
-  };
-
   return (
     <div className="space-y-4 animate-fade-in">
       {error && (
@@ -189,7 +216,10 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
         </div>
         <button
           onClick={() => {
+            setNewName('');
             setNewCode(generateCode());
+            setNewPhone('');
+            setError('');
             setShowAddForm(true);
           }}
           className="btn-primary flex items-center gap-2"
@@ -229,9 +259,7 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
               key={s}
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                statusFilter === s
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {s === 'all' ? 'Todos' : s === 'active' ? 'Ativos' : 'Inativos'}
@@ -240,230 +268,41 @@ export default function InterviewerManagement({ adminName }: InterviewerManageme
         </div>
       )}
 
-      {loading ? (
-        <div className="card p-12 text-center">
-          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
-          <p className="text-gray-500">Carregando...</p>
-        </div>
-      ) : interviewers.length === 0 ? (
-        <div className="card p-12 text-center">
-          <UserPlus className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">Nenhum entrevistador cadastrado</p>
-          <p className="text-gray-400 text-sm">Clique em "Adicionar Entrevistador" para começar</p>
-        </div>
-      ) : (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th
-                    className="text-left py-3 px-4 font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 select-none"
-                    onClick={() => handleSort('name')}
-                  >
-                    <span className="flex items-center gap-1">Nome <SortIcon field="name" /></span>
-                  </th>
-                  <th
-                    className="text-left py-3 px-4 font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 select-none"
-                    onClick={() => handleSort('code')}
-                  >
-                    <span className="flex items-center gap-1">ID/Código <SortIcon field="code" /></span>
-                  </th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-600 hidden sm:table-cell">Telefone</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-600 hidden md:table-cell">Cadastrado por</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-600 hidden lg:table-cell">Data</th>
-                  <th
-                    className="text-center py-3 px-4 font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 select-none"
-                    onClick={() => handleSort('is_active')}
-                  >
-                    <span className="flex items-center justify-center gap-1">Status <SortIcon field="is_active" /></span>
-                  </th>
-                  <th className="text-right py-3 px-4 font-semibold text-gray-600 no-print">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedAndFiltered.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-400">
-                      Nenhum entrevistador encontrado
-                    </td>
-                  </tr>
-                ) : sortedAndFiltered.map((intv) => (
-                  <tr key={intv.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${
-                          intv.is_active ? 'bg-blue-50' : 'bg-gray-100'
-                        }`}>
-                          <User className={`w-4 h-4 ${intv.is_active ? 'text-blue-600' : 'text-gray-400'}`} />
-                        </div>
-                        <span className="font-medium text-gray-800">{intv.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 rounded font-mono text-xs font-bold text-gray-700">
-                        <Hash className="w-3 h-3 text-gray-400" />
-                        {intv.code || '—'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600 hidden sm:table-cell">
-                      {intv.phone || '—'}
-                    </td>
-                    <td className="py-3 px-4 text-gray-500 hidden md:table-cell">{intv.created_by || '—'}</td>
-                    <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">
-                      {intv.created_at ? formatDate(intv.created_at) : '—'}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        intv.is_active
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {intv.is_active ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 no-print">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleActive(intv)}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            intv.is_active
-                              ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-                              : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
-                          }`}
-                          title={intv.is_active ? 'Desativar acesso' : 'Ativar acesso'}
-                        >
-                          {intv.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteConfirm(intv)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <InterviewerTable
+        interviewers={sortedAndFiltered}
+        loading={loading}
+        copiedId={copiedId}
+        sortField={sortField}
+        sortDir={sortDir}
+        onSort={handleSort}
+        onCopyLink={handleCopyLink}
+        onEdit={openEditModal}
+        onToggleActive={handleToggleActive}
+        onDeleteConfirm={setDeleteConfirm}
+      />
 
-      {showAddForm && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in"
-          onClick={() => setShowAddForm(false)}
-        >
-          <div
-            className="bg-white rounded-xl shadow-2xl max-w-md w-full animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-5 border-b border-gray-200">
-              <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-blue-600" />
-                <h3 className="font-semibold text-gray-900">Adicionar Entrevistador</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="label-text">Nome *</label>
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                  placeholder="Ex: Maria Silva"
-                  className="input-field"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="label-text">ID / Código *</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newCode}
-                    onChange={(e) => setNewCode(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                    placeholder="Ex: ENT-AB12"
-                    className="input-field font-mono uppercase"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setNewCode(generateCode())}
-                    className="px-3 py-2.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium whitespace-nowrap"
-                  >
-                    Gerar
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="label-text">Telefone (opcional)</label>
-                <input
-                  type="text"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                  placeholder="Ex: (81) 99999-9999"
-                  className="input-field"
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowAddForm(false)} className="btn-secondary">Cancelar</button>
-                <button
-                  type="button"
-                  onClick={handleAdd}
-                  disabled={adding}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  {adding ? 'Salvando...' : 'Adicionar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {(showAddForm || editingInterviewer) && (
+        <InterviewerFormModal
+          editingInterviewer={editingInterviewer}
+          newName={newName}
+          setNewName={setNewName}
+          newCode={newCode}
+          setNewCode={setNewCode}
+          newPhone={newPhone}
+          setNewPhone={setNewPhone}
+          processing={processing}
+          onClose={() => { setShowAddForm(false); setEditingInterviewer(null); }}
+          onSave={handleSave}
+          onGenerateCode={() => setNewCode(generateCode())}
+        />
       )}
 
       {deleteConfirm && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in"
-          onClick={() => setDeleteConfirm(null)}
-        >
-          <div
-            className="bg-white rounded-xl shadow-2xl max-w-md w-full animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5">
-              <h3 className="font-semibold text-gray-900 mb-2">Confirmar Exclusão</h3>
-              <p className="text-gray-600 mb-6">
-                Deseja realmente excluir <strong>{deleteConfirm.name}</strong>?
-              </p>
-              <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => setDeleteConfirm(null)} className="btn-secondary">Cancelar</button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(deleteConfirm)}
-                  className="px-5 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Excluir
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <InterviewerDeleteModal
+          deleteConfirm={deleteConfirm}
+          onClose={() => setDeleteConfirm(null)}
+          onConfirm={() => handleDelete(deleteConfirm)}
+        />
       )}
     </div>
   );

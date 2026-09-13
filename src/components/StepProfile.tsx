@@ -1,4 +1,4 @@
-import { Newspaper } from 'lucide-react';
+import { Newspaper, AlertCircle } from 'lucide-react';
 import {
   CANDIDATOS_FEDERAL, CANDIDATOS_ESTADUAL, INFLUENCIA_OPCOES, PESO_ESCOLHA,
 } from '@/data/surveyOptions';
@@ -14,10 +14,11 @@ interface StepProfileProps {
     peso_escolha_outro?: string;
     veiculo_comunicacao: string;
   };
+  errors: Record<string, string>;
   update: (field: string, value: string) => void;
 }
 
-export default function StepProfile({ form, update }: StepProfileProps) {
+export default function StepProfile({ form, errors, update }: StepProfileProps) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
@@ -31,6 +32,7 @@ export default function StepProfile({ form, update }: StepProfileProps) {
             <Chip key={c} label={c} selected={form.dep_federal === c} onClick={() => update('dep_federal', c)} />
           ))}
         </div>
+        {errors.dep_federal && <FieldError msg={errors.dep_federal} />}
       </QuestionBlock>
 
       <QuestionBlock number="8" title="Deputado Estadual (única escolha)">
@@ -39,6 +41,7 @@ export default function StepProfile({ form, update }: StepProfileProps) {
             <Chip key={c} label={c} selected={form.dep_estadual === c} onClick={() => update('dep_estadual', c)} />
           ))}
         </div>
+        {errors.dep_estadual && <FieldError msg={errors.dep_estadual} />}
       </QuestionBlock>
 
       <QuestionBlock number="9" title="Influência do apoio da prefeita Lucielle Laurentino">
@@ -47,6 +50,7 @@ export default function StepProfile({ form, update }: StepProfileProps) {
             <Chip key={i} label={i} selected={form.influencia_apoio === i} onClick={() => update('influencia_apoio', i)} />
           ))}
         </div>
+        {errors.influencia_apoio && <FieldError msg={errors.influencia_apoio} />}
       </QuestionBlock>
 
       <QuestionBlock number="10" title="O que mais pesa na escolha de um candidato? (espontânea)">
@@ -64,6 +68,7 @@ export default function StepProfile({ form, update }: StepProfileProps) {
             className="input-field mt-3"
           />
         )}
+        {errors.peso_escolha && <FieldError msg={errors.peso_escolha} />}
       </QuestionBlock>
 
       <QuestionBlock number="11" title="Veículo de comunicação em que mais confia (espontânea)">
@@ -88,6 +93,7 @@ export default function StepProfile({ form, update }: StepProfileProps) {
           placeholder="Ou digite outro veículo..."
           className="input-field"
         />
+        {errors.veiculo_comunicacao && <FieldError msg={errors.veiculo_comunicacao} />}
       </QuestionBlock>
     </div>
   );
@@ -102,6 +108,14 @@ function QuestionBlock({ number, title, children }: { number: string; title: str
       </div>
       <div className="ml-8">{children}</div>
     </div>
+  );
+}
+
+function FieldError({ msg }: { msg: string }) {
+  return (
+    <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+      <AlertCircle className="w-3.5 h-3.5" /> {msg}
+    </p>
   );
 }
 
