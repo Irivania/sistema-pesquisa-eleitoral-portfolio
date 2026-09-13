@@ -7,13 +7,20 @@ import type { Session } from '@/types/survey';
 
 const SESSION_KEY = 'bezerros_survey_session';
 
+type AuthSession = {
+  user?: {
+    email?: string | null;
+    user_metadata?: { name?: string; role?: 'master' | 'secondary' };
+  };
+};
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
     // Check for existing Supabase auth session (admin)
-    supabase.auth.getSession().then(({ data: { session: authSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: authSession } }: { data: { session: AuthSession | null } }) => {
       if (authSession) {
         const name =
           authSession.user?.user_metadata?.name ||
@@ -34,7 +41,8 @@ export default function App() {
     });
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, authSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event: string, authSession: AuthSession | null) => {
       if (authSession) {
         const name =
           authSession.user?.user_metadata?.name ||
@@ -43,7 +51,8 @@ export default function App() {
         const role = authSession.user?.user_metadata?.role || 'master';
         setSession({ profile: 'admin', name, role });
       }
-    });
+      },
+    );
 
     return () => subscription.unsubscribe();
   }, []);

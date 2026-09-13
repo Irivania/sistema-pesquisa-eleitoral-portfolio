@@ -20,13 +20,15 @@ const TOTAL_STEPS = 4;
 
 const emptyForm: Omit<SurveyData, 'interviewer_name'> = {
   rodada: 'p1_1t',
-  bairro: '',
+  cidade: '', // Atualizado de bairro para cidade (São Paulo)
   sexo: '',
   faixa_etaria: '',
   escolaridade: '',
   area: '',
   aval_prefeta: '',
   aval_governadora: '',
+  presidente: '',
+  governador: '',
   problema_principal: '',
   problema_principal_outro: '',
   senado_espontanea: [],
@@ -71,7 +73,7 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
     const newErrors: Record<string, string> = {};
     if (step === 0) {
       if (!form.rodada) newErrors.rodada = 'Selecione a rodada';
-      if (!form.bairro) newErrors.bairro = 'Selecione o bairro';
+      if (!form.cidade) newErrors.cidade = 'Selecione a cidade'; // Validação atualizada para cidade
       if (!form.sexo) newErrors.sexo = 'Selecione o sexo';
       if (!form.faixa_etaria) newErrors.faixa_etaria = 'Selecione a faixa etária';
       if (!form.escolaridade) newErrors.escolaridade = 'Selecione a escolaridade';
@@ -95,7 +97,7 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
-        setForm((prev) => ({ ...emptyForm, bairro: prev.bairro, rodada: prev.rodada }));
+        setForm((prev) => ({ ...emptyForm, cidade: prev.cidade, rodada: prev.rodada })); // Mantém a cidade e rodada atual para a próxima entrevista
         setStep(0);
         onSaved();
       }, 2000);

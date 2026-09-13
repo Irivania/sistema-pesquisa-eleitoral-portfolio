@@ -23,7 +23,7 @@ export default function SurveyDetailModal({ detailRow, onClose }: SurveyDetailMo
             <DetailItem label="Data/Hora" value={`${formatDate(detailRow.created_at || '')} às ${formatTime(detailRow.created_at || '')}`} />
           </DetailSection>
           <DetailSection title="Classificação">
-            <DetailItem label="Bairro" value={detailRow.bairro} />
+            <DetailItem label="Bairro" value={detailRow.bairro || detailRow.cidade} />
             <DetailItem label="Sexo" value={detailRow.sexo} />
             <DetailItem label="Faixa Etária" value={detailRow.faixa_etaria} />
             <DetailItem label="Escolaridade" value={detailRow.escolaridade} />

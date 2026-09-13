@@ -1,298 +1,226 @@
-# Sistema de Pesquisas Eleitorais
+# Sistema de Pesquisa Eleitoral
 
-Aplicação web para coleta, consolidação e análise de pesquisas de opinião eleitoral em Bezerros/PE. O sistema oferece uma experiência de coleta otimizada para entrevistadores em campo e um painel administrativo para coordenadores acompanharem a operação em tempo real.
+Aplicação web para coleta, acompanhamento e análise de pesquisas de opinião eleitoral. O sistema possui uma experiência otimizada para entrevistadores em campo e um painel administrativo para coordenação da operação.
 
-> **Status do projeto:** frontend funcional em React conectado diretamente ao Supabase. Antes de um uso em produção, aplique e valide todas as migrações no projeto Supabase e revise as políticas de Row Level Security descritas neste documento.
+> **Status:** projeto de portfólio em desenvolvimento. O frontend está funcional, mas a configuração atual de autenticação, autorização e persistência deve ser revisada antes de qualquer uso com dados reais.
 
-## 1. Visão Geral do Projeto
+## Visão geral
 
-O sistema foi desenvolvido para apoiar equipes de pesquisa que precisam registrar entrevistas presenciais, acompanhar o avanço da coleta e analisar os resultados por localidade, perfil demográfico, opinião e intenção de voto.
+O sistema atende dois fluxos principais:
 
-### Público-alvo
+- **Entrevistador:** seleciona seu cadastro, informa o código de acesso, preenche o questionário em etapas e acompanha sua produtividade.
+- **Administrador:** acessa indicadores, filtros, relatórios, comparação de rodadas, exportação CSV e gestão operacional.
 
-- **Entrevistadores:** profissionais que realizam entrevistas em campo usando celular ou computador.
-- **Coordenadores e administradores secundários:** usuários que acompanham indicadores, relatórios e entrevistas coletadas.
-- **Administrador Master:** responsável pela gestão da equipe, controle de horários, códigos de liberação e exclusões protegidas.
+### Recursos
 
-### Diferenciais
+- Formulário de pesquisa dividido em quatro etapas.
+- Coleta de dados demográficos, avaliação de gestão, problemas prioritários e intenção de voto.
+- Controle de horário de coleta entre 08:00 e 16:00.
+- Liberação excepcional por configuração global ou código individual.
+- Dashboard com visão geral, opinião, candidatos, comparação e relatórios individuais.
+- Gerenciamento de entrevistadores e permissões de administrador Master/Secundário na interface.
+- Exportação de dados filtrados para CSV e impressão do painel.
 
-- Formulário guiado em quatro etapas, adequado para coleta em dispositivos móveis.
-- Seleção de entrevistador com código individual de acesso.
-- Dashboard com filtros por rodada, bairro, área e entrevistador.
-- Gráficos de distribuição, relatórios individuais e comparação entre rodadas.
-- Controle operacional de horário de coleta entre 08h e 16h, com liberações globais ou individuais.
-- Exportação dos dados filtrados para CSV e impressão do painel.
-- Separação de permissões entre administradores Master e Secundários na interface.
+## Stack
 
-## 2. Arquitetura e Tecnologias
+- React 18
+- TypeScript 5
+- Vite 5
+- Tailwind CSS 3
+- Lucide React
+- Neon Serverless Driver
+- ESLint 9
 
-### Arquitetura
+## Arquitetura atual
 
-O projeto é uma Single Page Application (SPA) sem backend próprio. O navegador executa a aplicação React e acessa o Supabase diretamente por meio do SDK oficial. A autenticação administrativa usa Supabase Auth; o acesso do entrevistador usa a seleção de um cadastro ativo, código individual e uma sessão persistida no `localStorage`.
+O projeto executado a partir da raiz é uma SPA React sem backend próprio. O módulo [src/lib/supabase.ts](src/lib/supabase.ts) mantém uma API compatível com chamadas semelhantes às do Supabase, mas a persistência atual é feita por SQL através do driver `@neondatabase/serverless`.
 
 ```text
 Navegador
-	|
-	+-- React + TypeScript + Tailwind CSS
-	|     |
-	|     +-- Supabase Auth (administradores)
-	|     +-- Supabase PostgREST (dados e configurações)
-	|     +-- localStorage (sessão do entrevistador)
-	|
-	+-- Supabase PostgreSQL
+  |
+  +-- React + TypeScript + Tailwind CSS
+  |     |
+  |     +-- Fluxo de entrevistador
+  |     +-- Painel administrativo
+  |     +-- localStorage para sessão local do entrevistador
+  |
+  +-- src/lib/supabase.ts
+        |
+        +-- @neondatabase/serverless
+              |
+              +-- Banco PostgreSQL compatível com Neon
 ```
 
-### Tecnologias e bibliotecas
+### Atenção sobre Supabase
 
-- **React 18:** construção da interface por componentes e gerenciamento de estado.
-- **TypeScript 5:** tipagem estática dos dados, sessões e propriedades dos componentes.
-- **Vite 5:** servidor de desenvolvimento, resolução de módulos e build de produção.
-- **Tailwind CSS 3:** estilização utilitária e responsividade.
-- **PostCSS e Autoprefixer:** processamento e compatibilidade do CSS.
-- **Supabase JS:** integração com PostgreSQL via PostgREST e Supabase Auth.
-- **Supabase Auth:** login por email e senha para administradores.
-- **Lucide React:** biblioteca de ícones usada nos controles e painéis.
-- **ESLint 9 e typescript-eslint:** análise estática do código TypeScript/React.
-- **Node.js e npm:** instalação de dependências e execução dos scripts do projeto.
+Existe uma implementação anterior em `sistema-pesquisa-eleitoral/` que usa o SDK oficial do Supabase, além das migrações em `supabase/migrations/`. Essa pasta é uma cópia legada/paralela e não corresponde integralmente ao fluxo executado pela raiz.
 
-### Configurações relevantes
+Antes de publicar o projeto, escolha uma única estratégia de persistência:
 
-- Alias `@/*` aponta para `src/*`.
-- O código-fonte da aplicação está em `src/`.
-- O build de produção é gerado em `dist/`.
-- Não há roteamento React; as telas são controladas pelo estado da aplicação.
-- Não há framework de testes automatizados configurado atualmente.
+1. manter o adaptador Neon e alinhar o schema SQL, autenticação e operações CRUD ao Neon; ou
+2. migrar a raiz de volta para o Supabase oficial e usar as migrações e policies como base.
 
-## 3. Estruturação do Banco de Dados
+Não misture as variáveis e os contratos das duas integrações no mesmo ambiente.
 
-As migrações ficam em `supabase/migrations/` e devem ser executadas no projeto Supabase na ordem cronológica dos nomes dos arquivos.
+## Pré-requisitos
 
-### Tabela `surveys`
-
-Armazena cada questionário enviado. Contém:
-
-- Identificação: `id`, `interviewer_name`, `created_at`.
-- Classificação: `bairro`, `sexo`, `faixa_etaria`, `escolaridade`, `area`.
-- Opinião: `aval_prefeta`, `aval_governadora`, `problema_principal` e campo livre para outra resposta.
-- Intenção de voto: listas `senado_espontanea` e `senado_estimulada`, com até duas escolhas, além de rejeição, deputado federal e deputado estadual.
-- Perfil político: `influencia_apoio`, `peso_escolha`, campo livre complementar e `veiculo_comunicacao`.
-- A aplicação também utiliza o campo `rodada` para identificar uma das rodadas da pesquisa.
-
-Há índices para entrevistador, bairro, área e data de criação. O painel lê os registros, aplica filtros no cliente, calcula percentuais e gera exportações CSV no navegador.
-
-### Tabela `interviewers`
-
-Mantém a equipe cadastrada:
-
-- `id`: identificador UUID.
-- `name`: nome exibido ao entrevistador.
-- `code`: código/ID individual, com índice único parcial.
-- `phone`: telefone opcional.
-- `is_active`: define se o cadastro aparece no login de entrevistador.
-- `created_by` e `created_at`: auditoria básica do cadastro.
-
-O administrador Master pode cadastrar, listar, pesquisar, filtrar, ativar, desativar e excluir entrevistadores.
-
-### Tabela `app_settings`
-
-Tabela singleton, limitada ao registro `id = 1`, usada para armazenar a liberação global fora do horário padrão:
-
-- `override_active`;
-- `override_expires_at`;
-- `updated_at`;
-- `updated_by`.
-
-### Tabela `exception_codes`
-
-Armazena códigos de liberação individual de uso único:
-
-- `code`: valor único informado ao entrevistador;
-- `used`: indica se já foi consumido;
-- `created_by`, `created_at` e `used_at`.
-
-O administrador Master gera, copia e exclui códigos. O entrevistador valida um código disponível e, em seguida, ele é marcado como usado.
-
-### Fluxo de dados
-
-1. O administrador configura a equipe e, quando necessário, uma liberação de horário.
-2. O entrevistador escolhe um cadastro ativo e informa o código individual.
-3. Dentro do horário de coleta, o formulário fica disponível automaticamente. Fora dele, é necessário um override global ou código de exceção.
-4. O formulário envia uma linha para `surveys` após a quarta etapa.
-5. O painel consulta os dados, filtra e calcula os indicadores no cliente.
-
-### Segurança e pré-requisitos do schema
-
-As migrações atuais liberam `SELECT`, `INSERT`, `UPDATE` e, em alguns casos, `DELETE` para `anon` e `authenticated`. A separação Master/Secundário é aplicada principalmente no frontend e não está representada por policies específicas no banco. Portanto, essa configuração deve ser considerada adequada apenas para ambiente controlado ou protótipo até que as policies sejam endurecidas.
-
-Há duas verificações importantes antes da implantação:
-
-- O frontend usa `surveys.rodada`, mas a migração inicial de `surveys` não declara essa coluna. Crie uma migração complementar ou ajuste o schema antes de usar filtros e comparativos por rodada.
-- O cadastro de administradores secundários consulta `invite_tokens`, mas não existe migração dessa tabela neste repositório. O fluxo de convite secundário exige que essa tabela e suas policies sejam criadas no Supabase.
-
-## 4. Funcionalidades Principais
-
-### Modo Entrevistador
-
-O acesso começa na tela de login, que lista apenas entrevistadores ativos. Após selecionar o nome, o usuário precisa informar o código correspondente ao cadastro.
-
-#### Controle de coleta
-
-- Horário padrão: das **08h às 16h**, conforme o relógio local do navegador.
-- Fora do horário, o acesso ao formulário é bloqueado.
-- Um administrador pode liberar todos os entrevistadores por duração determinada ou indefinida.
-- Um código individual de uso único também pode liberar a coleta fora do horário.
-- A tela apresenta contadores de entrevistas próprias, total geral e quantidade restante para a meta de 400 entrevistas.
-
-#### Formulário em quatro etapas
-
-1. **Classificação:** rodada, bairro/localidade, sexo, faixa etária, escolaridade e área urbana/rural.
-2. **Opinião:** avaliação da prefeita, avaliação da governadora e principal problema de Bezerros.
-3. **Candidatos:** Senado espontâneo e estimulado, com até duas escolhas, e rejeição para o Senado.
-4. **Perfil político:** deputado federal, deputado estadual, influência do apoio da prefeita, fator de escolha e veículo de comunicação.
-
-A primeira etapa possui validações para os campos de classificação. As respostas são enviadas ao Supabase ao clicar em **Salvar Questionário** e o formulário é preparado para a próxima entrevista.
-
-### Painel Administrativo / Coordenador
-
-Após o login com Supabase Auth, o administrador acessa um painel com:
-
-- **Visão Geral:** distribuição por bairro, área, sexo, faixa etária, escolaridade e produtividade por entrevistador.
-- **Opinião:** avaliações de gestão, problemas principais, influência de apoio e fatores de escolha.
-- **Candidatos:** intenções espontâneas e estimuladas para o Senado, rejeição e escolhas para deputados.
-- **Comparativo / Cruzamento:** comparação da intenção de voto entre duas rodadas.
-- **Entrevistas:** tabela de registros com filtros, visualização de detalhes e exclusão protegida por senha para Master.
-- **Relatório Individual:** entrevistas, bairros cobertos, dias de coleta e envios detalhados por entrevistador.
-- **Exportação e impressão:** geração de CSV dos dados filtrados e impressão do painel.
-
-#### Recursos exclusivos do Administrador Master
-
-- Gerenciamento da equipe de entrevistadores.
-- Ativação e desativação de acessos.
-- Controle de liberação global de horário.
-- Geração, cópia e exclusão de códigos de exceção.
-- Exclusão de entrevistas mediante confirmação da senha do Supabase Auth.
-
-Administradores Secundários visualizam os dados e relatórios, mas não recebem as abas de gestão da equipe e controle de acessos na interface.
-
-## 5. Guia de Instalação e Execução Local
-
-### Pré-requisitos
-
-- Node.js em versão compatível com o Vite 5.
+- Node.js 18 ou superior.
 - npm.
-- Projeto Supabase criado e acessível.
-- Migrações do diretório `supabase/migrations/` aplicadas no banco.
+- Um banco PostgreSQL acessível pelo driver Neon.
+- Schema compatível com as consultas usadas em `src/lib/supabase.ts`.
 
-### Instalação
+## Configuração local
 
-Clone o repositório e instale as dependências:
+Na raiz do projeto, instale as dependências:
 
 ```bash
-git clone <URL_DO_REPOSITORIO>
-cd project
 npm install
 ```
 
-Crie um arquivo `.env` na raiz do projeto:
+Crie um arquivo `.env`:
 
 ```env
-VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_chave_publishable_ou_anon
+VITE_NEON_DATABASE_URL=postgresql://usuario:senha@host/banco?sslmode=require
 ```
 
-Use somente a chave publicável/anon no frontend. **Nunca coloque uma chave `service_role` ou `sb_secret` em `.env` usado pelo Vite**, pois variáveis `VITE_*` são incorporadas ao bundle do navegador.
+Como essa variável começa com `VITE_`, seu valor pode ser incluído no bundle do navegador. Não use uma string de conexão com privilégios administrativos em uma aplicação client-side. Para produção, mova as operações de banco para uma API ou função server-side e exponha ao frontend apenas credenciais públicas apropriadas.
 
-Inicie o servidor de desenvolvimento:
+Inicie o ambiente de desenvolvimento:
 
 ```bash
 npm run dev
 ```
 
-O Vite exibirá a URL local, normalmente `http://localhost:5173`.
+O Vite normalmente disponibiliza a aplicação em `http://localhost:5173`.
 
-### Scripts disponíveis
+## Scripts
 
 ```bash
-npm run dev        # servidor de desenvolvimento
-npm run build      # build de produção em dist/
-npm run preview    # servir o build localmente
-npm run typecheck  # verificação TypeScript
-npm run lint       # análise estática ESLint
+npm run dev        # inicia o servidor de desenvolvimento
+npm run typecheck  # verifica os tipos TypeScript
+npm run lint       # executa o ESLint
+npm run build      # gera o build de produção em dist/
+npm run preview    # serve o build localmente
 ```
 
-### Simulação de dados
+Antes de abrir um pull request, execute pelo menos:
 
-O arquivo `simulate.js` realiza inserções sintéticas diretamente na tabela `surveys`, com 20 registros simultâneos por padrão. Ele não autentica usuários e pode poluir a base com dados falsos. Execute somente em um projeto Supabase de teste e revise as credenciais embutidas no arquivo antes de usar:
+```bash
+npm run typecheck
+npm run lint
+npm run build
+```
+
+## Fluxos da aplicação
+
+### Entrevistador
+
+1. Escolhe o perfil de entrevistador.
+2. Seleciona um cadastro e informa seu código.
+3. Aguarda o horário permitido ou utiliza uma liberação válida.
+4. Preenche as etapas de classificação, opinião, candidatos e perfil político.
+5. Salva a entrevista e retorna ao fluxo de coleta.
+
+A sessão local do entrevistador é armazenada em `localStorage`. Esse mecanismo é adequado para demonstração, mas não substitui autenticação e autorização no servidor.
+
+### Administrador
+
+O painel oferece:
+
+- indicadores gerais e produtividade por entrevistador;
+- filtros por rodada, localidade, área e entrevistador;
+- análises de opinião e intenção de voto;
+- comparação entre rodadas;
+- consulta, detalhamento e exclusão de entrevistas;
+- relatório individual por entrevistador;
+- gestão de entrevistadores e liberações operacionais;
+- exportação CSV e impressão.
+
+O perfil Master recebe controles adicionais na interface. Essa distinção precisa ser reforçada no backend antes de uso em produção.
+
+## Banco de dados
+
+O código ativo consulta principalmente estas entidades:
+
+- `surveys`: respostas das entrevistas;
+- `interviewers`: cadastros e códigos dos entrevistadores;
+- `app_settings`: configuração de liberação global;
+- `exception_codes`: códigos de exceção de uso único;
+- `invite_tokens`: tokens relacionados ao fluxo de convites administrativos.
+
+As migrações disponíveis em [supabase/migrations](supabase/migrations) documentam uma versão anterior do schema. Elas devem ser tratadas como referência até que sejam revisadas para o banco escolhido e para os nomes de campos usados pelo código atual.
+
+### Pontos para alinhar antes da produção
+
+- O frontend atual utiliza `cidade` em partes do fluxo, enquanto migrações legadas utilizam `bairro`.
+- O campo `rodada` é usado pelo frontend e precisa existir no schema final.
+- O adaptador atual não substitui uma camada segura de autenticação.
+- As operações SQL devem ser executadas no servidor, nunca com uma string de conexão privilegiada exposta ao navegador.
+- O schema deve incluir índices para consultas por data, entrevistador e rodada quando o volume crescer.
+
+## Estrutura do projeto
+
+```text
+.
+├── src/
+│   ├── components/       # Login, coleta, dashboard e componentes visuais
+│   ├── data/             # Opções da pesquisa e metas
+│   ├── lib/              # Persistência, consultas e análises
+│   ├── types/            # Tipos do domínio
+│   ├── App.tsx           # Controle dos fluxos principais
+│   └── main.tsx          # Ponto de entrada React
+├── supabase/
+│   └── migrations/       # Migrações legadas/referenciais
+├── sistema-pesquisa-eleitoral/ # Cópia paralela com integração Supabase
+├── simulate.js           # Gerador de dados sintéticos
+├── index.html             # Documento de entrada
+├── package.json           # Dependências e scripts
+├── tailwind.config.js     # Configuração do Tailwind
+├── vite.config.ts         # Configuração do Vite e alias @
+└── README.md              # Documentação
+```
+
+## Dados de demonstração
+
+O arquivo `simulate.js` pode inserir dados sintéticos para testes controlados. Execute apenas contra um banco descartável e revise o arquivo antes de usar:
 
 ```bash
 node simulate.js
 ```
 
-Esse script não substitui testes automatizados nem deve ser usado como ferramenta de monitoramento de produção.
+O script não substitui testes automatizados e não deve ser executado contra produção.
 
-## 6. Configuração de Produção e Deploy
+## Deploy
 
-### Build de produção
-
-O projeto é uma SPA estática compatível com hospedagem na Vercel. O comando de build é:
+O frontend gera uma SPA estática:
 
 ```bash
 npm run build
 ```
 
-O diretório gerado para publicação é `dist/`.
+Publique o diretório `dist/` em um serviço compatível com Vite, como Vercel, Netlify ou Cloudflare Pages. Configure a variável de ambiente no provedor e valide o comportamento da aplicação em uma prévia antes de promover para produção.
 
-### Deploy contínuo na Vercel
+Checklist mínimo:
 
-Para configurar o deploy contínuo:
+- confirmar a estratégia de banco e aplicar o schema final;
+- remover credenciais privilegiadas do bundle do navegador;
+- implementar autenticação e autorização server-side;
+- configurar HTTPS e políticas de origem;
+- validar o fluxo em celular e desktop;
+- testar criação, leitura, atualização e exclusão de dados;
+- configurar backup, observabilidade e tratamento de erros;
+- revisar a proteção de dados pessoais e o período de retenção.
 
-1. Importe o repositório no painel da Vercel.
-2. Configure o framework como **Vite** ou deixe a detecção automática identificar o projeto.
-3. Defina o comando de build como `npm run build`.
-4. Defina o diretório de saída como `dist`.
-5. Cadastre `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` nas variáveis de ambiente da Vercel para os ambientes desejados.
-6. Faça um deploy de preview e valide login, leitura do banco, cadastro de entrevistador e envio de questionário.
-7. Promova o deploy para produção após confirmar a configuração do Supabase Auth e as URLs permitidas.
+## Limitações conhecidas
 
-Cada push para a branch conectada pode gerar um novo build automaticamente. O repositório não possui configuração específica de Vercel, portanto as migrações do Supabase precisam ser aplicadas separadamente, manualmente ou por um pipeline próprio.
+- Não há suíte de testes automatizados configurada.
+- A autorização de perfis ainda depende de lógica de frontend.
+- A sessão de entrevistador usa `localStorage`.
+- O código do entrevistador é validado no cliente.
+- O horário permitido depende do relógio local do dispositivo.
+- O dashboard trabalha com os dados carregados no cliente, sem paginação implementada.
+- O CSV pode conter dados pessoais e deve ser tratado como informação sensível.
 
-### Checklist de produção
+## Licença
 
-- Confirmar que todas as migrações foram aplicadas no projeto Supabase correto.
-- Criar as estruturas ausentes de `rodada` e `invite_tokens`, se os respectivos fluxos forem utilizados.
-- Configurar URLs de redirecionamento e confirmação de email no Supabase Auth.
-- Revisar as policies RLS e restringir operações administrativas a usuários autorizados.
-- Nunca expor chaves secretas no frontend ou nas variáveis `VITE_*`.
-- Testar o fluxo de entrevistador em dispositivos móveis.
-- Validar horário, fuso local e comportamento de códigos de exceção.
-- Evitar executar `simulate.js` contra a base de produção.
-
-## Estrutura de Pastas
-
-```text
-.
-├── src/
-│   ├── components/       # Telas, abas, formulário e componentes visuais
-│   ├── data/             # Opções da pesquisa e meta de entrevistas
-│   ├── lib/              # Cliente Supabase e funções analíticas/exportação
-│   └── types/            # Tipos TypeScript do domínio
-├── supabase/
-│   └── migrations/       # Schema, policies e índices do banco
-├── index.html            # Documento HTML de entrada
-├── simulate.js           # Inserção sintética para testes controlados
-├── package.json          # Dependências e scripts
-├── tailwind.config.js    # Configuração do Tailwind CSS
-├── vite.config.ts        # Configuração do Vite e alias @
-└── README.md             # Documentação do projeto
-```
-
-## Limitações Conhecidas
-
-- Não há testes automatizados configurados.
-- O painel carrega as entrevistas sem paginação, o que pode impactar grandes volumes.
-- A autorização Master/Secundário não é reforçada integralmente pelas policies do banco.
-- Códigos de entrevistador são carregados no navegador para validação client-side.
-- O horário depende do relógio local do dispositivo.
-- A sessão do entrevistador é armazenada no `localStorage` e não usa Supabase Auth.
-- Entrevistas identificam o autor por texto em `interviewer_name`, sem vínculo com uma identidade autenticada.
-- O CSV é produzido no navegador e pode conter informações sensíveis.
+Este repositório não declara uma licença de distribuição. Defina uma licença antes de disponibilizar o código para uso ou redistribuição.

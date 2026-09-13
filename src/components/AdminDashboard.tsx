@@ -170,7 +170,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
   const interviewerReportData = useMemo(() => {
     if (!selectedInterviewerReport) return null;
     const intvSurveys = filtered.filter((s) => s.interviewer_name === selectedInterviewerReport);
-    const bairrosCovered = Array.from(new Set(intvSurveys.map((s) => s.bairro))).sort();
+    const bairrosCovered = Array.from(new Set(intvSurveys.map((s) => s.bairro).filter((bairro): bairro is string => Boolean(bairro)))).sort();
     const areasCovered = Array.from(new Set(intvSurveys.map((s) => s.area))).sort();
     const firstSubmission = intvSurveys.length > 0
       ? intvSurveys.reduce((min, s) => {
@@ -234,7 +234,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
                 <h1 className="text-gray-900 font-bold text-base sm:text-lg leading-tight">
                   Painel de Apuração {isMaster ? '(Master)' : '(Secundário)'}
                 </h1>
-                <p className="text-gray-400 text-xs">Bezerros/PE — Setembro 2026 · Olá, {adminName}</p>
+                <p className="text-gray-400 text-xs">São Paulo/SP — Setembro de 2026 · Olá, {adminName}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -252,7 +252,7 @@ export default function AdminDashboard({ session, onLogout }: AdminDashboardProp
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="hidden print-only mb-6">
-          <h1 className="text-2xl font-bold">Levantamento Interno de Opinião — Bezerros/PE</h1>
+          <h1 className="text-2xl font-bold">Levantamento Interno de Opinião — São Paulo/SP</h1>
           <p className="text-gray-600">Setembro 2026 — Relatório de Apuração</p>
           <p className="text-gray-500 text-sm">Gerado em: {new Date().toLocaleDateString('pt-BR')}</p>
         </div>

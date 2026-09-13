@@ -1,14 +1,14 @@
 import { MapPin, AlertCircle } from 'lucide-react';
 import {
-  BAIRROS, SEXOS, FAIXAS_ETARIAS, ESCOLARIDADES, AREAS, RODADAS_PESQUISA, RodadaId,
+  CIDADES_SP, SEXOS, FAIXAS_ETARIAS, ESCOLARIDADES, AREAS, RODADAS_PESQUISA, RodadaId,
 } from '@/data/surveyOptions';
 
-const BAIRROS_COMUNS = ['Centro', 'Prados', 'São Sebastião', 'Santo Amaro', 'Bela Vista', 'Hulha'];
+const CIDADES_COMUNS = ['São Paulo', 'Guarulhos', 'Campinas', 'São Bernardo do Campo', 'Santo André', 'Osasco'];
 
 interface StepClassificationProps {
   form: {
     rodada?: RodadaId;
-    bairro: string;
+    cidade: string;
     sexo: string;
     faixa_etaria: string;
     escolaridade: string;
@@ -23,7 +23,7 @@ export default function StepClassification({ form, errors, update }: StepClassif
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
         <MapPin className="w-5 h-5 text-blue-600" />
-        <h2 className="text-gray-900 font-semibold">Localidade e Rodada da Pesquisa</h2>
+        <h2 className="text-gray-900 font-semibold">Localidade e Rodada da Pesquisa (São Paulo)</h2>
       </div>
 
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
@@ -43,33 +43,33 @@ export default function StepClassification({ form, errors, update }: StepClassif
       </div>
 
       <div>
-        <label className="label-text">Bairro / Localidade atual *</label>
+        <label className="label-text">Cidade / Município atual *</label>
         <div className="flex flex-wrap gap-2 mb-3">
-          {BAIRROS_COMUNS.map((b) => (
+          {CIDADES_COMUNS.map((c) => (
             <button
-              key={b}
+              key={c}
               type="button"
-              onClick={() => update('bairro', b)}
+              onClick={() => update('cidade', c)}
               className={`px-3.5 py-2 rounded-lg border text-xs font-medium transition-all ${
-                form.bairro === b
+                form.cidade === c
                   ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                   : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
-              📍 {b}
+              🏙️ {c}
             </button>
           ))}
         </div>
 
         <select
-          value={form.bairro}
-          onChange={(e) => update('bairro', e.target.value)}
+          value={form.cidade}
+          onChange={(e) => update('cidade', e.target.value)}
           className="input-field"
         >
-          <option value="">Ou selecione na lista completa de bairros...</option>
-          {BAIRROS.map((b) => <option key={b} value={b}>{b}</option>)}
+          <option value="">Ou selecione na lista completa de cidades...</option>
+          {CIDADES_SP.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        {errors.bairro && <FieldError msg={errors.bairro} />}
+        {errors.cidade && <FieldError msg={errors.cidade} />}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">

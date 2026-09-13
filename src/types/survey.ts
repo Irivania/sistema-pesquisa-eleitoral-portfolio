@@ -4,13 +4,17 @@ export interface SurveyData {
   id?: string;
   interviewer_name: string;
   rodada?: RodadaId;
-  bairro: string;
+  cidade: string;
+  /** Mantido para compatibilidade com relatórios antigos. */
+  bairro?: string;
   sexo: string;
   faixa_etaria: string;
   escolaridade: string;
   area: string;
   aval_prefeta: string;
   aval_governadora: string;
+  presidente: string;
+  governador: string;
   problema_principal: string;
   problema_principal_outro?: string;
   senado_espontanea: string[];
@@ -31,7 +35,7 @@ export interface Session {
   profile: UserProfile;
   name: string;
   interviewerId?: string;
-  role?: 'master' | 'secondary'; // <-- Papel do administrador (Master ou Secundário)
+  role?: 'master' | 'secondary'; // Papel do administrador (Master ou Secundário)
 }
 
 export interface Interviewer {

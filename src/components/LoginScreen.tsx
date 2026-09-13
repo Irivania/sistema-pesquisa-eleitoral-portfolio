@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   ClipboardList, BarChart3, User, Shield, ArrowRight, Landmark,
-  ArrowLeft, LogIn, AlertCircle, Search, Eye, EyeOff, Hash, KeyRound,
+  ArrowLeft, LogIn, AlertCircle, Search, Eye, EyeOff, Hash,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Session, Interviewer } from '@/types/survey';
@@ -9,8 +9,6 @@ import type { Session, Interviewer } from '@/types/survey';
 interface LoginScreenProps {
   onLogin: (session: Session) => void;
 }
-
-type AdminMode = 'signin' | 'signup';
 
 export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [profile, setProfile] = useState<'entrevistador' | 'admin' | null>(null);
@@ -25,13 +23,10 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [interviewerCodeInput, setInterviewerCodeInput] = useState('');
   const [interviewerError, setInterviewerError] = useState('');
 
-  // Admin auth state
-  const [adminMode, setAdminMode] = useState<AdminMode>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Admin auth state (pré-preenchido para acesso rápido no portfólio)
+  const [email, setEmail] = useState('admin@portifolio.com');
+  const [password, setPassword] = useState('123456');
   const [showPassword, setShowPassword] = useState(false);
-  const [adminName, setAdminName] = useState('');
-  const [secretCodeInput, setSecretCodeInput] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -41,14 +36,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
   const loadInterviewers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('interviewers')
-        .select('*')
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      setInterviewers((data || []) as Interviewer[]);
+      const res = await supabase.from('interviewers').select() as unknown as { data: Interviewer[] | null; error: unknown };
+      if (res.error) throw res.error;
+      setInterviewers((res.data || []) as Interviewer[]);
     } catch {
       // non-critical — show empty list
     } finally {
@@ -85,78 +75,17 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const handleAdminAuth = async () => {
     setAuthError('');
 
-    if (adminMode === 'signup') {
-      if (!adminName.trim()) { setAuthError('Por favor, informe seu nome completo.'); return; }
-      if (!email.trim()) { setAuthError('Por favor, informe um endereço de email válido.'); return; }
-      if (password.length < 6) { setAuthError('A senha é muito curta. Ela deve ter no mínimo 6 caracteres.'); return; }
-      if (!secretCodeInput.trim()) { setAuthError('Por favor, informe o código de convite fornecido pela conta mestre.'); return; }
-    } else {
-      if (!email.trim()) { setAuthError('Por favor, informe seu email.'); return; }
-      if (!password) { setAuthError('Por favor, informe sua senha.'); return; }
-    }
+    if (!email.trim()) { setAuthError('Por favor, informe seu email.'); return; }
+    if (!password) { setAuthError('Por favor, informe sua senha.'); return; }
 
     setAuthLoading(true);
     try {
-      if (adminMode === 'signup') {
-        const trimmedCode = secretCodeInput.trim().toUpperCase();
-
-        // 1. Valida o token temporário de convite no banco de dados
-        const { data: tokenData, error: tokenFetchError } = await supabase
-          .from('invite_tokens')
-          .select('*')
-          .eq('code', trimmedCode)
-          .eq('is_used', false)
-          .single();
-
-        if (tokenFetchError || !tokenData) {
-          setAuthError('Código de convite inválido ou já utilizado.');
-          setAuthLoading(false);
-          return;
-        }
-
-        // 2. Verifica se o token expirou (validade de 15 minutos)
-        if (new Date(tokenData.expires_at) < new Date()) {
-          setAuthError('Este código de convite expirou (validade de 15 minutos). Solicite um novo ao administrador mestre.');
-          setAuthLoading(false);
-          return;
-        }
-
-        const roleType = 'secondary'; // Contas criadas via convite secundário
-
-        // 3. Cria a conta no Supabase Auth
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: { 
-            data: { 
-              name: adminName.trim(),
-              role: roleType 
-            } 
-          },
-        });
-        if (error) throw error;
-
-        // 4. Marca o token como usado para que ele não possa mais ser reutilizado
-        await supabase
-          .from('invite_tokens')
-          .update({ is_used: true })
-          .eq('id', tokenData.id);
-
-        if (data.user) {
-          onLogin({ profile: 'admin', name: adminName.trim(), role: roleType });
-        }
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (error) throw error;
-        
-        const name = data.user?.user_metadata?.name || data.user?.email || 'Administrador';
-        const role = data.user?.user_metadata?.role || 'master';
-
-        onLogin({ profile: 'admin', name, role });
-      }
+      // Acesso livre garantido como Master para fins de portfólio
+      onLogin({ 
+        profile: 'admin', 
+        name: 'Administrador Master', 
+        role: 'master' 
+      });
     } catch (err) {
       setAuthError(
         err instanceof Error
@@ -181,7 +110,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             <Landmark className="w-8 h-8 text-blue-300" />
           </div>
           <h1 className="text-white text-2xl font-bold mb-1">Levantamento Interno de Opinião</h1>
-          <p className="text-blue-200/80 text-sm">Sistema de Apuração Eleitoral</p>
+          <p className="text-blue-200/80 text-sm">Sistema de Apuração Eleitoral — São Paulo/SP</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
@@ -384,46 +313,12 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   <Shield className="w-6 h-6 text-emerald-600" />
                 </div>
                 <div>
-                  <h2 className="text-gray-900 text-lg font-semibold">
-                    {adminMode === 'signin' ? 'Acesso do Administrador' : 'Cadastro de Conta Secundária'}
-                  </h2>
-                  <p className="text-gray-500 text-sm">
-                    {adminMode === 'signin'
-                      ? 'Entre com email e senha'
-                      : 'Requer código de convite mestre (válido por 15 min)'}
-                  </p>
+                  <h2 className="text-gray-900 text-lg font-semibold">Acesso do Administrador</h2>
+                  <p className="text-gray-500 text-sm">Acesso rápido para demonstração</p>
                 </div>
               </div>
 
               <div className="space-y-4">
-                {adminMode === 'signup' && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Nome completo</label>
-                      <input
-                        type="text"
-                        value={adminName}
-                        onChange={(e) => setAdminName(e.target.value)}
-                        placeholder="Ex: Coordenador Secundário"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-emerald-700 mb-1 flex items-center gap-1">
-                        <KeyRound className="w-3.5 h-3.5" /> Código de Convite Temporário *
-                      </label>
-                      <input
-                        type="text"
-                        value={secretCodeInput}
-                        onChange={(e) => setSecretCodeInput(e.target.value)}
-                        placeholder="Ex: KEY-XXXXXX"
-                        className="w-full px-3 py-2 border border-emerald-300 bg-emerald-50/50 rounded-lg text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                      <p className="text-[11px] text-gray-400 mt-1">Solicite o código gerado no painel mestre (expira em 15 min).</p>
-                    </div>
-                  </>
-                )}
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
                   <input
@@ -470,34 +365,8 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   disabled={authLoading}
                   className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {authLoading ? 'Aguarde...' : adminMode === 'signup' ? 'Concluir Cadastro' : 'Entrar'}
+                  {authLoading ? 'Aguarde...' : 'Entrar no Painel'}
                 </button>
-
-                <div className="text-center pt-2">
-                  {adminMode === 'signin' ? (
-                    <p className="text-sm text-gray-500">
-                      Possui um código de convite mestre?{' '}
-                      <button
-                        type="button"
-                        onClick={() => { setAdminMode('signup'); setAuthError(''); }}
-                        className="text-emerald-600 font-medium hover:text-emerald-700"
-                      >
-                        Cadastrar conta secundária
-                      </button>
-                    </p>
-                  ) : (
-                    <p className="text-sm text-gray-500">
-                      Já tem conta cadastrada?{' '}
-                      <button
-                        type="button"
-                        onClick={() => { setAdminMode('signin'); setAuthError(''); }}
-                        className="text-emerald-600 font-medium hover:text-emerald-700"
-                      >
-                        Fazer login
-                      </button>
-                    </p>
-                  )}
-                </div>
               </div>
             </div>
           )}
