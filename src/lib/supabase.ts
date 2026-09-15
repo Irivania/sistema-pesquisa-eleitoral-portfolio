@@ -43,6 +43,7 @@ type SupabaseCompat = {
   from: (table: string) => {
     select: (columns?: string, options?: { count?: string; head?: boolean }) => QueryBuilder;
     insert: (values: Record<string, unknown>[]) => Promise<QueryResult>;
+    upsert: (values: Record<string, unknown>, options?: { onConflict?: string }) => Promise<QueryResult>;
     update: (values: Record<string, unknown>) => { eq: (column: string, value: unknown) => Promise<{ error: DatabaseError | null }> };
     delete: () => { eq: (column: string, value: unknown) => Promise<{ error: DatabaseError | null }> };
   };
@@ -95,6 +96,12 @@ export const supabase = {
                 } else if (table === 'invite_tokens') {
                   const res = await sql`SELECT * FROM invite_tokens WHERE code = ${String(value)} LIMIT 1`;
                   data = res[0] || null;
+                } else if (table === 'app_settings') {
+                  const res = await sql`SELECT * FROM app_settings WHERE id = ${Number(value)} LIMIT 1`;
+                  data = res[0] || null;
+                } else if (table === 'exception_codes') {
+                  const res = await sql`SELECT * FROM exception_codes WHERE id = ${String(value)} LIMIT 1`;
+                  data = res[0] || null;
                 } else {
                   const res = await sql`SELECT * FROM surveys WHERE id = ${Number(value)} LIMIT 1`;
                   data = res[0] || null;
@@ -125,6 +132,10 @@ export const supabase = {
               data = await sql`SELECT * FROM interviewers ORDER BY name ASC`;
             } else if (table === 'invite_tokens') {
               data = await sql`SELECT * FROM invite_tokens ORDER BY created_at DESC`;
+            } else if (table === 'app_settings') {
+              data = await sql`SELECT * FROM app_settings WHERE id = 1`;
+            } else if (table === 'exception_codes') {
+              data = await sql`SELECT * FROM exception_codes ORDER BY created_at DESC`;
             } else {
               data = await sql`SELECT * FROM surveys ORDER BY created_at DESC`;
             }
@@ -153,6 +164,11 @@ export const supabase = {
             INSERT INTO invite_tokens (code, expires_at, is_used)
             VALUES (${String(item.code)}, ${String(item.expires_at)}, ${Boolean(item.is_used ?? false)})
           `;
+        } else if (table === 'exception_codes') {
+          await sql`
+            INSERT INTO exception_codes (code, created_by)
+            VALUES (${String(item.code)}, ${item.created_by ? String(item.created_by) : null})
+          `;
         } else {
           await sql`
             INSERT INTO surveys (
@@ -165,6 +181,34 @@ export const supabase = {
           `;
         }
         return { data: [item], error: null };
+      } catch (error) {
+        return { data: null, error };
+      }
+    },
+    upsert: async (values: Record<string, unknown>) => {
+      try {
+        const item = values;
+        if (table === 'app_settings') {
+          const result = await sql`
+            INSERT INTO app_settings (
+              id, override_active, override_expires_at, updated_at, updated_by
+            ) VALUES (
+              ${Number(item.id ?? 1)}, ${Boolean(item.override_active)},
+              ${item.override_expires_at ? String(item.override_expires_at) : null},
+              ${item.updated_at ? String(item.updated_at) : new Date().toISOString()},
+              ${item.updated_by ? String(item.updated_by) : null}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              override_active = EXCLUDED.override_active,
+              override_expires_at = EXCLUDED.override_expires_at,
+              updated_at = EXCLUDED.updated_at,
+              updated_by = EXCLUDED.updated_by
+            RETURNING *
+          `;
+          return { data: result[0] || null, error: null };
+        }
+
+        return { data: null, error: new Error(`Upsert não suportado para a tabela ${table}`) };
       } catch (error) {
         return { data: null, error };
       }
@@ -189,6 +233,8 @@ export const supabase = {
               await sql`DELETE FROM interviewers WHERE id = ${Number(value)}`;
             } else if (table === 'invite_tokens') {
               await sql`DELETE FROM invite_tokens WHERE id = ${Number(value)}`;
+            } else if (table === 'exception_codes') {
+              await sql`DELETE FROM exception_codes WHERE id = ${String(value)}`;
             } else {
               await sql`DELETE FROM surveys WHERE id = ${Number(value)}`;
             }

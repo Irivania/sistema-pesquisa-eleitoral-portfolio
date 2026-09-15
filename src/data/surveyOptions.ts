@@ -139,9 +139,9 @@ export const PESO_ESCOLHA = [
 ];
 
 export const RODADAS_PESQUISA = [
-  { id: 'p1_1t', name: 'Pesquisa SP — 1º Turno' },
-  { id: 'p2_1t', name: 'Pesquisa SP — 2º Turno' },
-  { id: 'p3_1t', name: 'Pesquisa SP — 3º Levantamento' },
+  { id: 'p1_1t', name: 'Pesquisa SP — 1º Turno', turno: '1º Turno' },
+  { id: 'p2_1t', name: 'Pesquisa SP — 2º Turno', turno: '2º Turno' },
+  { id: 'p3_1t', name: 'Pesquisa SP — 3º Levantamento', turno: '3º Levantamento' },
 ] as const;
 
 export type RodadaId = typeof RODADAS_PESQUISA[number]['id'];

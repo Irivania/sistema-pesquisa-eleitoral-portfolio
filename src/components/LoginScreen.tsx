@@ -47,8 +47,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   };
 
   const filteredInterviewers = interviewers.filter((i) =>
-    i.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (i.code || '').toLowerCase().includes(searchTerm.toLowerCase())
+    i.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleInterviewerLogin = () => {
@@ -61,7 +60,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     }
 
     if (interviewerCodeInput.trim().toUpperCase() !== (selectedInterviewer.code || '').toUpperCase()) {
-      setInterviewerError('Código de acesso incorreto. Verifique seu crachá.');
+      setInterviewerError('Código de acesso incorreto. Verifique suas credenciais.');
       return;
     }
 
@@ -110,7 +109,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             <Landmark className="w-8 h-8 text-blue-300" />
           </div>
           <h1 className="text-white text-2xl font-bold mb-1">Levantamento Interno de Opinião</h1>
-          <p className="text-blue-200/80 text-sm">Sistema de Apuração Eleitoral — São Paulo/SP</p>
+          <p className="text-blue-200/80 text-sm">Sistema de Apuração Eleitoral</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
@@ -239,9 +238,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <span className="font-medium text-gray-800 block">{intv.name}</span>
-                                  {intv.code && (
-                                    <span className="text-xs text-gray-400 font-mono">{intv.code}</span>
-                                  )}
+                                  <span className="text-xs text-gray-400">Toque para selecionar</span>
                                 </div>
                                 <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors shrink-0" />
                               </button>
@@ -253,7 +250,13 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   )}
                 </div>
               ) : (
-                <div className="space-y-4">
+                <form
+                  className="space-y-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleInterviewerLogin();
+                  }}
+                >
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-xl">
                       <Hash className="w-6 h-6 text-blue-600" />
@@ -265,12 +268,11 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Código de Acesso (Ex: ENT-XXXX)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Código de Acesso Secreto</label>
                     <input
-                      type="text"
+                      type="password"
                       value={interviewerCodeInput}
                       onChange={(e) => setInterviewerCodeInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleInterviewerLogin()}
                       placeholder="Digite seu código..."
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
                       autoFocus
@@ -284,13 +286,12 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   )}
 
                   <button
-                    type="button"
-                    onClick={handleInterviewerLogin}
+                    type="submit"
                     className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors shadow-sm"
                   >
                     <LogIn className="w-4 h-4" /> Entrar no Sistema
                   </button>
-                </div>
+                </form>
               )}
             </div>
           )}

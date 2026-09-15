@@ -75,11 +75,10 @@ export default function AccessControl({ adminName }: AccessControlProps) {
   }, [load]);
 
   const handleToggleOverride = async () => {
-    if (!settings) return;
     setActionLoading(true);
     setError('');
 
-    const newState = !settings.override_active;
+    const newState = !(settings?.override_active ?? false);
     let expiresAt: string | null = null;
 
     if (newState && duration !== '0') {
@@ -90,13 +89,13 @@ export default function AccessControl({ adminName }: AccessControlProps) {
     try {
       const { error } = await supabase
         .from('app_settings')
-        .update({
+        .upsert({
+          id: 1,
           override_active: newState,
           override_expires_at: expiresAt,
           updated_at: new Date().toISOString(),
           updated_by: adminName,
-        })
-        .eq('id', 1);
+        }, { onConflict: 'id' });
 
       if (error) throw error;
       await load();

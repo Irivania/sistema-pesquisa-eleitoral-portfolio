@@ -4,6 +4,7 @@ export interface SurveyData {
   id?: string;
   interviewer_name: string;
   rodada?: RodadaId;
+  estado?: string; // Novo campo para suportar qualquer estado do Brasil
   cidade: string;
   /** Mantido para compatibilidade com relatórios antigos. */
   bairro?: string;
@@ -27,6 +28,10 @@ export interface SurveyData {
   peso_escolha_outro?: string;
   veiculo_comunicacao: string;
   created_at?: string;
+  latitude?: number;  // Suporte a geolocalização (GPS)
+  longitude?: number; // Suporte a geolocalização (GPS)
+  segundo_turno?: string; // Suporte à simulação de 2º turno (Confronto Direto)
+  respostas_json?: Record<string, unknown> | null;
 }
 
 export type UserProfile = 'entrevistador' | 'admin';
@@ -36,6 +41,7 @@ export interface Session {
   name: string;
   interviewerId?: string;
   role?: 'master' | 'secondary'; // Papel do administrador (Master ou Secundário)
+  allowed_state?: string; // Escopo opcional para restringir o admin a um estado específico se desejado
 }
 
 export interface Interviewer {

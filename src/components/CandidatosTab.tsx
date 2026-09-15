@@ -1,4 +1,4 @@
-import { Vote } from 'lucide-react';
+import { Vote, GitCompare } from 'lucide-react';
 import { HorizontalBarChart } from '@/components/Charts';
 
 interface CandidatosTabProps {
@@ -7,6 +7,7 @@ interface CandidatosTabProps {
   rejeicaoData: { label: string; count: number; pct: number }[];
   depFedData: { label: string; count: number; pct: number }[];
   depEstData: { label: string; count: number; pct: number }[];
+  segundoTurnoData?: { label: string; count: number; pct: number }[]; // Novo gráfico de 2º Turno
 }
 
 export default function CandidatosTab({
@@ -15,9 +16,19 @@ export default function CandidatosTab({
   rejeicaoData,
   depFedData,
   depEstData,
+  segundoTurnoData = [],
 }: CandidatosTabProps) {
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Simulação de 2º Turno (Confronto Direto) em destaque se houver dados */}
+      {segundoTurnoData.length > 0 && (
+        <div className="p-4 bg-purple-50/60 border border-purple-200 rounded-xl">
+          <ChartCard title="Simulação de 2º Turno — Confronto Direto (Head-to-Head)" icon={GitCompare}>
+            <HorizontalBarChart data={segundoTurnoData} />
+          </ChartCard>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Senado — Espontânea (até 2 escolhas)" icon={Vote}>
           <HorizontalBarChart data={senadoEspData} />
@@ -26,6 +37,7 @@ export default function CandidatosTab({
           <HorizontalBarChart data={senadoEstData} />
         </ChartCard>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Rejeição para o Senado" icon={Vote}>
           <HorizontalBarChart data={rejeicaoData} />
@@ -34,6 +46,7 @@ export default function CandidatosTab({
           <HorizontalBarChart data={depFedData} />
         </ChartCard>
       </div>
+
       <ChartCard title="Deputado Estadual" icon={Vote}>
         <HorizontalBarChart data={depEstData} />
       </ChartCard>

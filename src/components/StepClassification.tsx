@@ -1,13 +1,13 @@
 import { MapPin, AlertCircle } from 'lucide-react';
 import {
-  CIDADES_SP, SEXOS, FAIXAS_ETARIAS, ESCOLARIDADES, AREAS, RODADAS_PESQUISA, RodadaId,
+  SEXOS, FAIXAS_ETARIAS, ESCOLARIDADES, AREAS, RODADAS_PESQUISA, RodadaId,
 } from '@/data/surveyOptions';
-
-const CIDADES_COMUNS = ['São Paulo', 'Guarulhos', 'Campinas', 'São Bernardo do Campo', 'Santo André', 'Osasco'];
+import { estadosBrasil } from '@/data/electoralConfigs';
 
 interface StepClassificationProps {
   form: {
     rodada?: RodadaId;
+    estado?: string;
     cidade: string;
     sexo: string;
     faixa_etaria: string;
@@ -23,52 +23,57 @@ export default function StepClassification({ form, errors, update }: StepClassif
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
         <MapPin className="w-5 h-5 text-blue-600" />
-        <h2 className="text-gray-900 font-semibold">Localidade e Rodada da Pesquisa (São Paulo)</h2>
+        <h2 className="text-gray-900 font-semibold">Localidade e Rodada da Pesquisa (Brasil)</h2>
       </div>
 
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-        <label className="block text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1.5">
-          Rodada Atual *
-        </label>
-        <select
-          value={form.rodada || 'p1_1t'}
-          onChange={(e) => update('rodada', e.target.value as RodadaId)}
-          className="input-field bg-white text-sm font-medium border-blue-300"
-        >
-          {RODADAS_PESQUISA.map((r) => (
-            <option key={r.id} value={r.id}>{r.name}</option>
-          ))}
-        </select>
-        {errors.rodada && <FieldError msg={errors.rodada} />}
-      </div>
-
-      <div>
-        <label className="label-text">Cidade / Município atual *</label>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {CIDADES_COMUNS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => update('cidade', c)}
-              className={`px-3.5 py-2 rounded-lg border text-xs font-medium transition-all ${
-                form.cidade === c
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                  : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              🏙️ {c}
-            </button>
-          ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Seleção da Rodada */}
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+          <label className="block text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1.5">
+            Rodada Atual *
+          </label>
+          <select
+            value={form.rodada || 'p1_1t'}
+            onChange={(e) => update('rodada', e.target.value as RodadaId)}
+            className="input-field bg-white text-sm font-medium border-blue-300"
+          >
+            {RODADAS_PESQUISA.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+          {errors.rodada && <FieldError msg={errors.rodada} />}
         </div>
 
-        <select
+        {/* Seleção do Estado (Abrangência Nacional) */}
+        <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+          <label className="block text-xs font-semibold text-indigo-900 uppercase tracking-wide mb-1.5">
+            Estado (UF) *
+          </label>
+          <select
+            value={form.estado || 'SP'}
+            onChange={(e) => update('estado', e.target.value)}
+            className="input-field bg-white text-sm font-medium border-indigo-300"
+          >
+            {estadosBrasil.map((est) => (
+              <option key={est.sigla} value={est.sigla}>
+                {est.nome} ({est.sigla})
+              </option>
+            ))}
+          </select>
+          {errors.estado && <FieldError msg={errors.estado} />}
+        </div>
+      </div>
+
+      {/* Cidade / Município */}
+      <div>
+        <label className="label-text">Cidade / Município atual *</label>
+        <input
+          type="text"
           value={form.cidade}
           onChange={(e) => update('cidade', e.target.value)}
+          placeholder="Digite o nome da cidade (ex: São Paulo, Recife, Belo Horizonte...)"
           className="input-field"
-        >
-          <option value="">Ou selecione na lista completa de cidades...</option>
-          {CIDADES_SP.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        />
         {errors.cidade && <FieldError msg={errors.cidade} />}
       </div>
 

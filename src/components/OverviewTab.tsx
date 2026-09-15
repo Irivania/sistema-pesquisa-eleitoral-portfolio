@@ -10,6 +10,7 @@ interface OverviewTabProps {
   faixaData: { label: string; count: number; pct: number }[];
   escolaridadeData: { label: string; count: number; pct: number }[];
   interviewerStats: { name: string; count: number }[];
+  selectedState?: string; // Novo: Estado selecionado para filtro visual no painel
 }
 
 export default function OverviewTab({
@@ -20,11 +21,21 @@ export default function OverviewTab({
   faixaData,
   escolaridadeData,
   interviewerStats,
+  selectedState,
 }: OverviewTabProps) {
   return (
     <div className="space-y-6 animate-fade-in">
+      {selectedState && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between text-sm text-blue-900">
+          <span>Exibindo dados filtrados para o estado: <strong>{selectedState}</strong></span>
+          <span className="text-xs bg-blue-200 text-blue-800 font-semibold px-2.5 py-1 rounded-full">
+            {surveys.length} pesquisas encontradas
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Distribuição por Bairro" icon={MapPin}>
+        <ChartCard title="Distribuição por Bairro / Cidade" icon={MapPin}>
           <HorizontalBarChart data={bairroData} />
         </ChartCard>
         <ChartCard title="Distribuição por Área" icon={Layers}>

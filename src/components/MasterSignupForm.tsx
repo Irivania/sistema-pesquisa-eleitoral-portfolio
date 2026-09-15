@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, KeyRound, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { ArrowLeft, KeyRound, Eye, EyeOff, AlertCircle, MapPin } from 'lucide-react';
 import type { Session } from '@/types/survey';
+import { estadosBrasil } from '@/data/electoralConfigs';
 
 interface MasterSignupFormProps {
   onBack: () => void;
@@ -12,6 +13,7 @@ export default function MasterSignupForm({ onBack, onLogin }: MasterSignupFormPr
   const [adminName, setAdminName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [allowedState, setAllowedState] = useState('SP'); // Estado padrão do admin
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
@@ -31,14 +33,20 @@ export default function MasterSignupForm({ onBack, onLogin }: MasterSignupFormPr
         options: { 
           data: { 
             name: adminName.trim(),
-            role: roleType 
+            role: roleType,
+            allowed_state: allowedState // Salvando o estado restrito do admin
           } 
         },
       });
       if (error) throw error;
 
       if (data.user) {
-        onLogin({ profile: 'admin', name: adminName.trim(), role: roleType });
+        onLogin({ 
+          profile: 'admin', 
+          name: adminName.trim(), 
+          role: roleType,
+          allowed_state: allowedState 
+        });
       }
     } catch (err) {
       setAuthError(
@@ -69,7 +77,7 @@ export default function MasterSignupForm({ onBack, onLogin }: MasterSignupFormPr
         </div>
         <div>
           <h2 className="text-gray-900 text-lg font-semibold">Cadastro de Administrador Master</h2>
-          <p className="text-gray-500 text-sm">Crie o primeiro acesso principal do sistema</p>
+          <p className="text-gray-500 text-sm">Crie o primeiro acesso principal e defina o estado regional</p>
         </div>
       </div>
 
@@ -95,6 +103,24 @@ export default function MasterSignupForm({ onBack, onLogin }: MasterSignupFormPr
             placeholder="exemplo@email.com"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+        </div>
+
+        {/* Seleção do Estado de Atuação do Admin */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1 flex items-center gap-1">
+            <MapPin className="w-3.5 h-3.5 text-blue-600" /> Estado de Atuação Principal (UF)
+          </label>
+          <select
+            value={allowedState}
+            onChange={(e) => setAllowedState(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {estadosBrasil.map((est) => (
+              <option key={est.sigla} value={est.sigla}>
+                {est.nome} ({est.sigla})
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>

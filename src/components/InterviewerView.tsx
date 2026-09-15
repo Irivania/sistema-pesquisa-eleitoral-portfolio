@@ -4,7 +4,6 @@ import {
   Lock, KeyRound, X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { META_ENTREVISTAS } from '@/data/surveyOptions';
 import SurveyForm from '@/components/SurveyForm';
 
 interface InterviewerViewProps {
@@ -33,6 +32,7 @@ function formatCurrentTime(): string {
 export default function InterviewerView({ name, onLogout }: InterviewerViewProps) {
   const [myCount, setMyCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [metaEntrevistas, setMetaEntrevistas] = useState(500); // Meta padrão de 500 configurada na cotação
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [overrideActive, setOverrideActive] = useState(false);
   const [showCodeInput, setShowCodeInput] = useState(false);
@@ -41,7 +41,7 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
   const [codeLoading, setCodeLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(formatCurrentTime());
 
-  const loadCounts = useCallback(async () => {
+  const loadCountsAndMeta = useCallback(async () => {
     try {
       const { count: total } = await supabase
         .from('surveys')
@@ -51,6 +51,16 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
         .from('surveys')
         .select('*', { count: 'exact', head: true })
         .eq('interviewer_name', name);
+
+      // Tenta buscar a meta cadastrada nas configurações da rodada/frente
+      const { data: configData } = await supabase
+        .from('survey_configs')
+        .select('*')
+        .maybeSingle();
+
+      if (configData && (configData as Record<string, unknown>).meta) {
+        setMetaEntrevistas(Number((configData as Record<string, unknown>).meta) || 500);
+      }
 
       setTotalCount(total || 0);
       setMyCount(mine || 0);
@@ -71,7 +81,6 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
 
       if (data) {
         const s = data as unknown as AppSettings;
-        // Check if override is active and not expired
         if (s.override_active) {
           if (s.override_expires_at) {
             const expiry = new Date(s.override_expires_at).getTime();
@@ -95,11 +104,10 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
   }, []);
 
   useEffect(() => {
-    loadCounts();
+    loadCountsAndMeta();
     loadSettings();
-  }, [loadCounts, loadSettings]);
+  }, [loadCountsAndMeta, loadSettings]);
 
-  // Update clock every minute
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(formatCurrentTime());
@@ -108,12 +116,14 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
   }, []);
 
   const handleSaved = () => {
-    loadCounts();
+    loadCountsAndMeta();
   };
 
   const handleValidateCode = async () => {
-    if (!codeValue.trim()) {
-      setCodeError('Digite o código de liberação.');
+    const codigoDigitado = codeValue ? codeValue.trim().toUpperCase() : '';
+
+    if (!codigoDigitado || codigoDigitado === 'UNDEFINED') {
+      setCodeError('Digite um código de liberação válido.');
       return;
     }
 
@@ -124,7 +134,7 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
       const { data, error } = await supabase
         .from('exception_codes')
         .select('id, used')
-        .eq('code', codeValue.trim().toUpperCase())
+        .eq('code', codigoDigitado)
         .eq('used', false)
         .maybeSingle();
 
@@ -135,11 +145,11 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
         return;
       }
 
-      // Mark code as used
+      const registro = data as Record<string, unknown>;
       const { error: updateError } = await supabase
         .from('exception_codes')
         .update({ used: true, used_at: new Date().toISOString() })
-        .eq('id', (data as Record<string, unknown>).id);
+        .eq('id', registro.id);
 
       if (updateError) throw updateError;
 
@@ -187,7 +197,7 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
       </div>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-        {/* Stats bar */}
+        {/* Stats bar corrigido para a meta configurada (500) */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="card p-4 text-center">
             <p className="text-2xl font-bold text-blue-600">{myCount}</p>
@@ -198,8 +208,8 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
             <p className="text-xs text-gray-500 mt-0.5">Total geral</p>
           </div>
           <div className="card p-4 text-center">
-            <p className="text-2xl font-bold text-amber-600">{META_ENTREVISTAS - totalCount}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Faltam p/ meta</p>
+            <p className="text-2xl font-bold text-amber-600">{Math.max(0, metaEntrevistas - totalCount)}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Faltam p/ meta ({metaEntrevistas})</p>
           </div>
         </div>
 
@@ -217,7 +227,6 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
           </div>
         ) : !canCollect ? (
           <div className="space-y-4 mb-6">
-            {/* Blocked banner */}
             <div className="card p-6 border-amber-200 bg-amber-50">
               <div className="flex items-start gap-4">
                 <div className="flex items-center justify-center w-12 h-12 bg-amber-100 rounded-xl shrink-0">
@@ -239,7 +248,6 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
               </div>
             </div>
 
-            {/* Exception code input */}
             {!showCodeInput ? (
               <button
                 onClick={() => setShowCodeInput(true)}
@@ -307,12 +315,10 @@ export default function InterviewerView({ name, onLogout }: InterviewerViewProps
               </div>
             )}
 
-            {/* Form */}
             <SurveyForm interviewerName={name} onSaved={handleSaved} />
           </>
         )}
 
-        {/* Footer hint */}
         <div className="mt-6 flex items-start gap-2 text-xs text-gray-400 px-2">
           <ChevronRight className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <p>

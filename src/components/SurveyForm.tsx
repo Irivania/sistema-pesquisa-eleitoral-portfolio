@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Check, ChevronRight, ChevronLeft, Save, CheckCircle2,
   AlertCircle, RotateCcw, MapPin, Vote, TrendingUp, Newspaper,
@@ -6,6 +6,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import type { SurveyData } from '@/types/survey';
 import { RodadaId } from '@/data/surveyOptions';
+import { electoralConfigs } from '@/data/electoralConfigs';
 import StepClassification from './StepClassification';
 import StepOpinion from './StepOpinion';
 import StepCandidates from './StepCandidates';
@@ -20,7 +21,8 @@ const TOTAL_STEPS = 4;
 
 const emptyForm: Omit<SurveyData, 'interviewer_name'> = {
   rodada: 'p1_1t',
-  cidade: '', // Atualizado de bairro para cidade (São Paulo)
+  estado: 'PE', // Estado padrão de fallback para Bezerros/PE
+  cidade: 'Bezerros', // Cidade padrão de fallback
   sexo: '',
   faixa_etaria: '',
   escolaridade: '',
@@ -49,6 +51,65 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  const [frentesPermitidas, setFrentesPermitidas] = useState<Record<string, unknown>[]>([]);
+  const [loadingFrentes, setLoadingFrentes] = useState(true);
+
+  // Busca as frentes em que este entrevistador foi escalado de forma robusta
+  useEffect(() => {
+    async function carregarFrentes() {
+      try {
+        const { data, error } = await supabase.from('survey_configs').select('*');
+        
+        if (error) {
+          console.warn('Tabela survey_configs não encontrada ou vazia, usando fallback padrão.');
+        }
+
+        const frentes = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+
+        const minhasFrentes = frentes.filter((cfg) => {
+          const entrevistadores = cfg.interviewers || cfg.entrevistadoresEscalados || cfg.team;
+          if (Array.isArray(entrevistadores)) {
+            return entrevistadores.some((item: unknown) => {
+              const nome = typeof item === 'string'
+                ? item
+                : typeof item === 'object' && item !== null && 'name' in item && typeof item.name === 'string'
+                  ? item.name
+                  : undefined;
+
+              return nome?.toLowerCase() === interviewerName.toLowerCase();
+            });
+          }
+          return false;
+        });
+
+        if (minhasFrentes.length > 0) {
+          setFrentesPermitidas(minhasFrentes);
+          const primeiraFrente = minhasFrentes[0];
+          setForm((prev) => ({
+            ...prev,
+            estado: (primeiraFrente.estado as string) || 'PE',
+            cidade: (primeiraFrente.cidade as string) || 'Bezerros',
+            rodada: (primeiraFrente.rodada as RodadaId) || prev.rodada,
+          }));
+        } else {
+          setFrentesPermitidas([{
+            cidade: 'Bezerros',
+            estado: 'PE',
+            rodada: 'p1_1t'
+          }]);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar frentes:', err);
+      } finally {
+        setLoadingFrentes(false);
+      }
+    }
+
+    carregarFrentes();
+  }, [interviewerName]);
+
+  const currentConfig = electoralConfigs[form.estado || 'PE'] || electoralConfigs['PE'];
+
   const update = (field: string, value: string | string[] | RodadaId | undefined) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => {
@@ -73,7 +134,8 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
     const newErrors: Record<string, string> = {};
     if (step === 0) {
       if (!form.rodada) newErrors.rodada = 'Selecione a rodada';
-      if (!form.cidade) newErrors.cidade = 'Selecione a cidade'; // Validação atualizada para cidade
+      if (!form.estado) newErrors.estado = 'Selecione o estado';
+      if (!form.cidade) newErrors.cidade = 'Selecione a cidade';
       if (!form.sexo) newErrors.sexo = 'Selecione o sexo';
       if (!form.faixa_etaria) newErrors.faixa_etaria = 'Selecione a faixa etária';
       if (!form.escolaridade) newErrors.escolaridade = 'Selecione a escolaridade';
@@ -86,18 +148,56 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
   const nextStep = () => { if (validateStep()) setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1)); };
   const prevStep = () => setStep((s) => Math.max(s - 1, 0));
 
+  const obterGeolocalizacao = (): Promise<{ latitude: number | null; longitude: number | null }> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve({ latitude: null, longitude: null });
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.warn('Aviso de GPS:', error.message);
+          resolve({ latitude: null, longitude: null });
+        },
+        { timeout: 10000, enableHighAccuracy: true }
+      );
+    });
+  };
+
+  // Função de salvamento refatorada para a estrutura JSONB
   const handleSave = async () => {
     setSaving(true);
     setErrors({});
     try {
-      const payload = { ...form, interviewer_name: interviewerName };
+      const { latitude, longitude } = await obterGeolocalizacao();
+
+      // Separa os metadados fixos de controle e agrupa as perguntas no JSONB
+      const { rodada, estado, cidade, ...perguntasDoQuestionario } = form;
+
+      const payload = {
+        rodada,
+        estado,
+        cidade,
+        interviewer_name: interviewerName,
+        latitude,
+        longitude,
+        respostas_json: perguntasDoQuestionario, // Payload dinâmico flexível
+      };
+
       const { error } = await supabase.from('surveys').insert([payload]);
       if (error) throw error;
 
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
-        setForm((prev) => ({ ...emptyForm, cidade: prev.cidade, rodada: prev.rodada })); // Mantém a cidade e rodada atual para a próxima entrevista
+        setForm((prev) => ({ ...emptyForm, estado: prev.estado, cidade: prev.cidade, rodada: prev.rodada })); 
         setStep(0);
         onSaved();
       }, 2000);
@@ -111,8 +211,61 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
   const stepIcons = [MapPin, Vote, TrendingUp, Newspaper];
   const stepLabels = ['Classificação', 'Opinião', 'Candidatos', 'Perfil'];
 
+  if (loadingFrentes) {
+    return (
+      <div className="card p-8 text-center">
+        <div className="w-6 h-6 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2" />
+        <p className="text-sm text-gray-500">Carregando permissões de praça...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto">
+      {/* Exibição da praça ativa ou seletor caso haja mais de uma */}
+      {frentesPermitidas.length > 1 ? (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
+          <div>
+            <span className="text-xs font-semibold text-blue-800 uppercase block">Múltiplas Frentes Vinculadas</span>
+            <p className="text-sm text-gray-700">Escolha em qual praça deseja registrar a entrevista:</p>
+          </div>
+          <select
+            value={form.cidade}
+            onChange={(e) => {
+              const selecionada = frentesPermitidas.find((f) => f.cidade === e.target.value);
+              if (selecionada) {
+                setForm((prev) => ({
+                  ...prev,
+                  cidade: (selecionada.cidade as string) || '',
+                  estado: (selecionada.estado as string) || 'PE',
+                  rodada: (selecionada.rodada as RodadaId) || prev.rodada,
+                }));
+              }
+            }}
+            className="input-field text-sm font-semibold text-blue-900 bg-white py-1"
+          >
+            {frentesPermitidas.map((frente, idx) => (
+              <option key={idx} value={frente.cidade as string}>
+                {(frente.cidade as string)} — {(frente.estado as string)}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+          <div>
+            <span className="text-xs font-semibold text-gray-500 uppercase block">Frente de Coleta Ativa</span>
+            <p className="text-sm font-bold text-gray-800">
+              {form.cidade ? `${form.cidade} — ${form.estado}` : 'Bezerros — PE'}
+            </p>
+          </div>
+          <div className="text-right">
+            <span className="text-xs text-gray-400 block">Operador</span>
+            <span className="text-sm font-semibold text-blue-600">{interviewerName}</span>
+          </div>
+        </div>
+      )}
+
       {/* Stepper Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
@@ -141,7 +294,7 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
             <CheckCircle2 className="w-12 h-12 text-emerald-600" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Questionário Salvo!</h2>
-          <p className="text-gray-500">Preparando para a próxima entrevista...</p>
+          <p className="text-gray-500">Salvando dados geolocalizados para {currentConfig.nomeEstado}...</p>
         </div>
       ) : (
         <div className="card p-6 sm:p-8 animate-fade-in">
@@ -159,14 +312,14 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
             <div>{step > 0 && <button type="button" onClick={prevStep} className="btn-secondary flex items-center gap-1.5"><ChevronLeft className="w-4 h-4" /> Voltar</button>}</div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400 mr-2">Etapa {step + 1} de {TOTAL_STEPS}</span>
+              <span className="text-sm text-gray-400 mr-2">Etapa {step + 1} de {TOTAL_STEPS} ({currentConfig.nomeEstado})</span>
               {step < TOTAL_STEPS - 1 ? (
                 <button type="button" onClick={nextStep} className="btn-primary flex items-center gap-1.5">Avançar <ChevronRight className="w-4 h-4" /></button>
               ) : (
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => { setForm(emptyForm); setStep(0); setErrors({}); }} className="btn-secondary flex items-center gap-1.5"><RotateCcw className="w-4 h-4" /> Limpar</button>
                   <button type="button" onClick={handleSave} disabled={saving} className="btn-primary bg-emerald-600 hover:bg-emerald-700 flex items-center gap-2">
-                    {saving ? 'Salvando...' : <><Save className="w-4 h-4" /> Salvar Questionário</>}
+                    {saving ? 'Salvando com GPS...' : <><Save className="w-4 h-4" /> Salvar Questionário</>}
                   </button>
                 </div>
               )}
