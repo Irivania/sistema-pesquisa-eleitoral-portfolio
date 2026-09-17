@@ -2,7 +2,7 @@ import { MapPin, AlertCircle } from 'lucide-react';
 import {
   SEXOS, FAIXAS_ETARIAS, ESCOLARIDADES, AREAS, RODADAS_PESQUISA, RodadaId,
 } from '@/data/surveyOptions';
-import { estadosBrasil } from '@/data/electoralConfigs';
+import { EstadoConfig } from '@/data/electoralConfigs';
 
 interface StepClassificationProps {
   form: {
@@ -16,14 +16,24 @@ interface StepClassificationProps {
   };
   errors: Record<string, string>;
   update: (field: string, value: string | RodadaId) => void;
+  config: EstadoConfig;
+  estadosBrasil: Array<{ sigla: string; nome: string }>;
 }
 
-export default function StepClassification({ form, errors, update }: StepClassificationProps) {
+export default function StepClassification({
+  form,
+  errors,
+  update,
+  config,
+  estadosBrasil,
+}: StepClassificationProps) {
   return (
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
         <MapPin className="w-5 h-5 text-blue-600" />
-        <h2 className="text-gray-900 font-semibold">Localidade e Rodada da Pesquisa (Brasil)</h2>
+        <h2 className="text-gray-900 font-semibold">
+          Localidade e Rodada da Pesquisa ({config.nomeEstado})
+        </h2>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

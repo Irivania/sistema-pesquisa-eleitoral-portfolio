@@ -15,6 +15,7 @@ export interface SurveyData {
   aval_prefeta: string;
   aval_governadora: string;
   presidente: string;
+  prefeito?: string; // Adicionado para suportar candidaturas a prefeito por município
   governador: string;
   problema_principal: string;
   problema_principal_outro?: string;

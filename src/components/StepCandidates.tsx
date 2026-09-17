@@ -2,16 +2,18 @@ import { useState, useMemo } from 'react';
 import { Vote, Search } from 'lucide-react';
 import { 
   CANDIDATOS_SENADO, 
-  CANDIDATOS_GOVERNADOR, 
   CANDIDATOS_PRESIDENTE, 
   DEPUTADOS_FEDERAIS_SP, 
   DEPUTADOS_ESTADUAIS_SP 
 } from '@/data/surveyOptions';
+import { EstadoConfig } from '@/data/electoralConfigs';
 
 interface StepCandidatesProps {
   form: {
+    cidade: string;
     presidente: string;
     governador: string;
+    prefeito?: string;
     senado_espontanea: string[];
     senado_estimulada: string[];
     rejeicao_senado: string;
@@ -20,14 +22,22 @@ interface StepCandidatesProps {
   };
   update: (field: string, value: string | string[]) => void;
   toggleArrayItem: (field: 'senado_espontanea' | 'senado_estimulada', item: string, max: number) => void;
+  config: EstadoConfig;
 }
 
-export default function StepCandidates({ form, update, toggleArrayItem }: StepCandidatesProps) {
+export default function StepCandidates({ form, update, toggleArrayItem, config }: StepCandidatesProps) {
   // Estados locais para a busca interativa de deputados
   const [searchFed, setSearchFed] = useState('');
   const [searchEst, setSearchEst] = useState('');
 
-  // Filtro inteligente para Deputado Federal (Nome, Número ou Partido)
+  // Busca a configuração específica da cidade selecionada (ex: candidatos a prefeito locais)
+  const municipioConfig = form.cidade ? config.municipios[form.cidade] : null;
+  const candidatosPrefeito = municipioConfig?.candidatosPrefeito || [
+    'Nenhum / Branco / Nulo',
+    'Não sabe / Indeciso'
+  ];
+
+  // Filtro inteligente para Deputado Federal
   const filteredFederais = useMemo(() => {
     const term = searchFed.toLowerCase().trim();
     if (!term) return DEPUTADOS_FEDERAIS_SP.slice(0, 6);
@@ -36,7 +46,7 @@ export default function StepCandidates({ form, update, toggleArrayItem }: StepCa
     );
   }, [searchFed]);
 
-  // Filtro inteligente para Deputado Estadual (Nome, Número ou Partido)
+  // Filtro inteligente para Deputado Estadual
   const filteredEstaduais = useMemo(() => {
     const term = searchEst.toLowerCase().trim();
     if (!term) return DEPUTADOS_ESTADUAIS_SP.slice(0, 6);
@@ -49,11 +59,22 @@ export default function StepCandidates({ form, update, toggleArrayItem }: StepCa
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
         <Vote className="w-5 h-5 text-blue-600" />
-        <h2 className="text-gray-900 font-semibold">Intenções de Voto - Eleições 2026 (SP)</h2>
+        <h2 className="text-gray-900 font-semibold">Intenções de Voto — Eleições ({config.nomeEstado})</h2>
       </div>
 
+      {/* Cargo de Prefeito (Municipal - Condicional caso a cidade possua lista cadastrada) */}
+      {municipioConfig && (
+        <QuestionBlock number="1" title={`Prefeito(a) de ${form.cidade} — Estimulada (única escolha)`}>
+          <div className="flex flex-wrap gap-2">
+            {candidatosPrefeito.map((c) => (
+              <Chip key={c} label={c} selected={form.prefeito === c} onClick={() => update('prefeito', c)} />
+            ))}
+          </div>
+        </QuestionBlock>
+      )}
+
       {/* Presidente */}
-      <QuestionBlock number="1" title="Presidente da República — Estimulada (única escolha)">
+      <QuestionBlock number="2" title="Presidente da República — Estimulada (única escolha)">
         <div className="flex flex-wrap gap-2">
           {CANDIDATOS_PRESIDENTE.map((c) => (
             <Chip key={c} label={c} selected={form.presidente === c} onClick={() => update('presidente', c)} />
@@ -61,27 +82,27 @@ export default function StepCandidates({ form, update, toggleArrayItem }: StepCa
         </div>
       </QuestionBlock>
 
-      {/* Governador de SP */}
-      <QuestionBlock number="2" title="Governador de São Paulo — Estimulada (única escolha)">
+      {/* Governador Dinâmico por Estado */}
+      <QuestionBlock number="3" title={`Governador(a) de ${config.nomeEstado} — Estimulada (única escolha)`}>
         <div className="flex flex-wrap gap-2">
-          {CANDIDATOS_GOVERNADOR.map((c) => (
+          {config.cargosGov.map((c) => (
             <Chip key={c} label={c} selected={form.governador === c} onClick={() => update('governador', c)} />
           ))}
         </div>
       </QuestionBlock>
 
       {/* Senado Espontânea */}
-      <QuestionBlock number="3" title="Senado — Espontânea (até 2 escolhas)">
+      <QuestionBlock number="4" title="Senado — Espontânea (até 2 escolhas)">
         <MultiChoice options={CANDIDATOS_SENADO} selected={form.senado_espontanea || []} onToggle={(item) => toggleArrayItem('senado_espontanea', item, 2)} max={2} />
       </QuestionBlock>
 
       {/* Senado Estimulada */}
-      <QuestionBlock number="4" title="Senado — Estimulada (até 2 escolhas)">
+      <QuestionBlock number="5" title="Senado — Estimulada (até 2 escolhas)">
         <MultiChoice options={CANDIDATOS_SENADO} selected={form.senado_estimulada || []} onToggle={(item) => toggleArrayItem('senado_estimulada', item, 2)} max={2} />
       </QuestionBlock>
 
       {/* Rejeição Senado */}
-      <QuestionBlock number="5" title="Rejeição para o Senado (única escolha)">
+      <QuestionBlock number="6" title="Rejeição para o Senado (única escolha)">
         <div className="flex flex-wrap gap-2">
           {CANDIDATOS_SENADO.map((c) => (
             <Chip key={c} label={c} selected={form.rejeicao_senado === c} onClick={() => update('rejeicao_senado', c)} />
@@ -90,7 +111,7 @@ export default function StepCandidates({ form, update, toggleArrayItem }: StepCa
       </QuestionBlock>
 
       {/* Deputado Federal com Busca Inteligente */}
-      <QuestionBlock number="6" title="Deputado Federal (Busque por Nome, Número ou Partido)">
+      <QuestionBlock number="7" title="Deputado Federal (Busque por Nome, Número ou Partido)">
         <div className="space-y-3">
           <div className="relative">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -126,7 +147,7 @@ export default function StepCandidates({ form, update, toggleArrayItem }: StepCa
       </QuestionBlock>
 
       {/* Deputado Estadual com Busca Inteligente */}
-      <QuestionBlock number="7" title="Deputado Estadual (Busque por Nome, Número ou Partido)">
+      <QuestionBlock number="8" title={`Deputado Estadual — ${config.nomeEstado} (Busque por Nome, Número ou Partido)`}>
         <div className="space-y-3">
           <div className="relative">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />

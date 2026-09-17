@@ -2,11 +2,13 @@ import { Newspaper, AlertCircle } from 'lucide-react';
 import {
   CANDIDATOS_FEDERAL, CANDIDATOS_ESTADUAL, INFLUENCIA_OPCOES, PESO_ESCOLHA,
 } from '@/data/surveyOptions';
+import { EstadoConfig } from '@/data/electoralConfigs';
 
 const VEICULOS_COMUNICACAO_COMUNS = ['Instagram', 'Rádio', 'Facebook', 'WhatsApp', 'TV', 'Portal de Notícias'];
 
 interface StepProfileProps {
   form: {
+    cidade: string;
     dep_federal: string;
     dep_estadual: string;
     influencia_apoio: string;
@@ -16,14 +18,20 @@ interface StepProfileProps {
   };
   errors: Record<string, string>;
   update: (field: string, value: string) => void;
+  config: EstadoConfig;
 }
 
-export default function StepProfile({ form, errors, update }: StepProfileProps) {
+export default function StepProfile({ form, errors, update, config }: StepProfileProps) {
+  // Define o rótulo dinâmico para a pergunta de influência de liderança/apoio com base na praça
+  const tituloInfluenciaApoio = form.cidade 
+    ? `Influência do apoio da liderança local em ${form.cidade}` 
+    : `Influência do apoio político (${config.nomeEstado})`;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
         <Newspaper className="w-5 h-5 text-blue-600" />
-        <h2 className="text-gray-900 font-semibold">Deputados e Perfil Político</h2>
+        <h2 className="text-gray-900 font-semibold">Deputados e Perfil Político ({config.nomeEstado})</h2>
       </div>
 
       <QuestionBlock number="7" title="Deputado Federal (única escolha)">
@@ -35,7 +43,7 @@ export default function StepProfile({ form, errors, update }: StepProfileProps) 
         {errors.dep_federal && <FieldError msg={errors.dep_federal} />}
       </QuestionBlock>
 
-      <QuestionBlock number="8" title="Deputado Estadual (única escolha)">
+      <QuestionBlock number="8" title={`Deputado Estadual — ${config.nomeEstado} (única escolha)`}>
         <div className="flex flex-wrap gap-2">
           {CANDIDATOS_ESTADUAL.map((c) => (
             <Chip key={c} label={c} selected={form.dep_estadual === c} onClick={() => update('dep_estadual', c)} />
@@ -44,7 +52,7 @@ export default function StepProfile({ form, errors, update }: StepProfileProps) 
         {errors.dep_estadual && <FieldError msg={errors.dep_estadual} />}
       </QuestionBlock>
 
-      <QuestionBlock number="9" title="Influência do apoio da prefeita Lucielle Laurentino">
+      <QuestionBlock number="9" title={tituloInfluenciaApoio}>
         <div className="flex flex-wrap gap-2">
           {INFLUENCIA_OPCOES.map((i) => (
             <Chip key={i} label={i} selected={form.influencia_apoio === i} onClick={() => update('influencia_apoio', i)} />

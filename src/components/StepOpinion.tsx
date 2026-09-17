@@ -1,8 +1,10 @@
 import { Vote, AlertCircle } from 'lucide-react';
 import { AVALIACOES, PROBLEMAS } from '@/data/surveyOptions';
+import { EstadoConfig } from '@/data/electoralConfigs';
 
 interface StepOpinionProps {
   form: {
+    cidade: string;
     aval_prefeta: string;
     aval_governadora: string;
     problema_principal: string;
@@ -10,38 +12,61 @@ interface StepOpinionProps {
   };
   errors: Record<string, string>;
   update: (field: string, value: string) => void;
+  config: EstadoConfig;
 }
 
-export default function StepOpinion({ form, errors, update }: StepOpinionProps) {
+export default function StepOpinion({ form, errors, update, config }: StepOpinionProps) {
+  // Define os cargos/rótulos dinâmicos com base na configuração do estado
+  const labelPrefeitura = config.avaliacoes?.labelPrefeitura || `Avaliação da Gestão Municipal (${config.nomeEstado})`;
+  const labelGoverno = config.avaliacoes?.labelGoverno || `Avaliação da Gestão Estadual (${config.nomeEstado})`;
+  const nomeLocal = form.cidade || config.nomeEstado;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
         <Vote className="w-5 h-5 text-blue-600" />
-        <h2 className="text-gray-900 font-semibold">Avaliação e Opinião</h2>
+        <h2 className="text-gray-900 font-semibold">Avaliação e Opinião ({config.nomeEstado})</h2>
       </div>
 
-      <QuestionBlock number="1" title="Avaliação da prefeita Lucielle Laurentino">
+      <QuestionBlock number="1" title={labelPrefeitura}>
         <div className="flex flex-wrap gap-2">
           {AVALIACOES.map((a) => (
-            <Chip key={a} label={a} selected={form.aval_prefeta === a} onClick={() => update('aval_prefeta', a)} color={ratingColor(a)} />
+            <Chip 
+              key={a} 
+              label={a} 
+              selected={form.aval_prefeta === a} 
+              onClick={() => update('aval_prefeta', a)} 
+              color={ratingColor(a)} 
+            />
           ))}
         </div>
         {errors.aval_prefeta && <FieldError msg={errors.aval_prefeta} />}
       </QuestionBlock>
 
-      <QuestionBlock number="2" title="Avaliação da governadora Raquel Lyra">
+      <QuestionBlock number="2" title={labelGoverno}>
         <div className="flex flex-wrap gap-2">
           {AVALIACOES.map((a) => (
-            <Chip key={a} label={a} selected={form.aval_governadora === a} onClick={() => update('aval_governadora', a)} color={ratingColor(a)} />
+            <Chip 
+              key={a} 
+              label={a} 
+              selected={form.aval_governadora === a} 
+              onClick={() => update('aval_governadora', a)} 
+              color={ratingColor(a)} 
+            />
           ))}
         </div>
         {errors.aval_governadora && <FieldError msg={errors.aval_governadora} />}
       </QuestionBlock>
 
-      <QuestionBlock number="3" title="Principal problema de Bezerros (espontânea)">
+      <QuestionBlock number="3" title={`Principal problema de ${nomeLocal} (espontânea)`}>
         <div className="flex flex-wrap gap-2">
           {PROBLEMAS.map((p) => (
-            <Chip key={p} label={p} selected={form.problema_principal === p} onClick={() => update('problema_principal', p)} />
+            <Chip 
+              key={p} 
+              label={p} 
+              selected={form.problema_principal === p} 
+              onClick={() => update('problema_principal', p)} 
+            />
           ))}
         </div>
         {form.problema_principal === 'Outra' && (

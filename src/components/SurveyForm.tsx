@@ -6,7 +6,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import type { SurveyData } from '@/types/survey';
 import { RodadaId } from '@/data/surveyOptions';
-import { electoralConfigs } from '@/data/electoralConfigs';
+import { electoralConfigs, estadosBrasil } from '@/data/electoralConfigs';
 import StepClassification from './StepClassification';
 import StepOpinion from './StepOpinion';
 import StepCandidates from './StepCandidates';
@@ -21,8 +21,8 @@ const TOTAL_STEPS = 4;
 
 const emptyForm: Omit<SurveyData, 'interviewer_name'> = {
   rodada: 'p1_1t',
-  estado: 'PE', // Estado padrão de fallback para Bezerros/PE
-  cidade: 'Bezerros', // Cidade padrão de fallback
+  estado: 'SP', // Estado padrão inicial
+  cidade: '', // Cidade será preenchida conforme o estado
   sexo: '',
   faixa_etaria: '',
   escolaridade: '',
@@ -31,6 +31,7 @@ const emptyForm: Omit<SurveyData, 'interviewer_name'> = {
   aval_governadora: '',
   presidente: '',
   governador: '',
+  prefeito: '',
   problema_principal: '',
   problema_principal_outro: '',
   senado_espontanea: [],
@@ -54,7 +55,7 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
   const [frentesPermitidas, setFrentesPermitidas] = useState<Record<string, unknown>[]>([]);
   const [loadingFrentes, setLoadingFrentes] = useState(true);
 
-  // Busca as frentes em que este entrevistador foi escalado de forma robusta
+  // Busca as frentes em que este entrevistador foi escalado
   useEffect(() => {
     async function carregarFrentes() {
       try {
@@ -85,18 +86,23 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
         if (minhasFrentes.length > 0) {
           setFrentesPermitidas(minhasFrentes);
           const primeiraFrente = minhasFrentes[0];
+          const est = (primeiraFrente.estado as string) || 'SP';
+          const cid = (primeiraFrente.cidade as string) || '';
+          
           setForm((prev) => ({
             ...prev,
-            estado: (primeiraFrente.estado as string) || 'PE',
-            cidade: (primeiraFrente.cidade as string) || 'Bezerros',
+            estado: est,
+            cidade: cid,
             rodada: (primeiraFrente.rodada as RodadaId) || prev.rodada,
           }));
         } else {
+          // Fallback padrão caso não esteja vinculado estritamente a uma frente na tabela
           setFrentesPermitidas([{
-            cidade: 'Bezerros',
-            estado: 'PE',
+            cidade: 'São Paulo',
+            estado: 'SP',
             rodada: 'p1_1t'
           }]);
+          setForm((prev) => ({ ...prev, estado: 'SP', cidade: 'São Paulo' }));
         }
       } catch (err) {
         console.error('Erro ao carregar frentes:', err);
@@ -108,10 +114,24 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
     carregarFrentes();
   }, [interviewerName]);
 
-  const currentConfig = electoralConfigs[form.estado || 'PE'] || electoralConfigs['PE'];
+  // Configuração eleitoral dinâmica baseada no estado selecionado
+  const currentConfig = electoralConfigs[form.estado || 'SP'] || electoralConfigs['SP'];
 
-  const update = (field: string, value: string | string[] | RodadaId | undefined) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const update = (field: string, value: any) => {
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+
+      // Se o estado mudar, redefine a cidade para a primeira disponível do novo estado
+      if (field === 'estado') {
+        const novaConfig = electoralConfigs[value];
+        const primeiroMunicipio = novaConfig ? Object.keys(novaConfig.municipios)[0] || '' : '';
+        next.cidade = primeiroMunicipio;
+      }
+
+      return next;
+    });
+
     setErrors((prev) => {
       const next = { ...prev };
       delete next[field];
@@ -171,14 +191,12 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
     });
   };
 
-  // Função de salvamento refatorada para a estrutura JSONB
   const handleSave = async () => {
     setSaving(true);
     setErrors({});
     try {
       const { latitude, longitude } = await obterGeolocalizacao();
 
-      // Separa os metadados fixos de controle e agrupa as perguntas no JSONB
       const { rodada, estado, cidade, ...perguntasDoQuestionario } = form;
 
       const payload = {
@@ -188,7 +206,7 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
         interviewer_name: interviewerName,
         latitude,
         longitude,
-        respostas_json: perguntasDoQuestionario, // Payload dinâmico flexível
+        respostas_json: perguntasDoQuestionario,
       };
 
       const { error } = await supabase.from('surveys').insert([payload]);
@@ -222,7 +240,7 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Exibição da praça ativa ou seletor caso haja mais de uma */}
+      {/* Exibição da praça ativa / Seletor dinâmico de Estado e Cidade */}
       {frentesPermitidas.length > 1 ? (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
           <div>
@@ -234,10 +252,11 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
             onChange={(e) => {
               const selecionada = frentesPermitidas.find((f) => f.cidade === e.target.value);
               if (selecionada) {
+                const est = (selecionada.estado as string) || 'SP';
                 setForm((prev) => ({
                   ...prev,
                   cidade: (selecionada.cidade as string) || '',
-                  estado: (selecionada.estado as string) || 'PE',
+                  estado: est,
                   rodada: (selecionada.rodada as RodadaId) || prev.rodada,
                 }));
               }
@@ -254,9 +273,9 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
       ) : (
         <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-gray-500 uppercase block">Frente de Coleta Ativa</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase block">Frente de Coleta Ativa ({currentConfig.nomeEstado})</span>
             <p className="text-sm font-bold text-gray-800">
-              {form.cidade ? `${form.cidade} — ${form.estado}` : 'Bezerros — PE'}
+              {form.cidade ? `${form.cidade} — ${form.estado}` : `${currentConfig.nomeEstado}`}
             </p>
           </div>
           <div className="text-right">
@@ -298,10 +317,19 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
         </div>
       ) : (
         <div className="card p-6 sm:p-8 animate-fade-in">
-          {step === 0 && <StepClassification form={form} errors={errors} update={update} />}
-          {step === 1 && <StepOpinion form={form} errors={errors} update={update} />}
-          {step === 2 && <StepCandidates form={form} update={update} toggleArrayItem={toggleArrayItem} />}
-          {step === 3 && <StepProfile form={form} errors={errors} update={update} />}
+          {/* Repassando o config e os estados disponíveis para os componentes filhos */}
+          {step === 0 && (
+            <StepClassification 
+              form={form} 
+              errors={errors} 
+              update={update} 
+              config={currentConfig} 
+              estadosBrasil={estadosBrasil} 
+            />
+          )}
+          {step === 1 && <StepOpinion form={form} errors={errors} update={update} config={currentConfig} />}
+          {step === 2 && <StepCandidates form={form} update={update} toggleArrayItem={toggleArrayItem} config={currentConfig} />}
+          {step === 3 && <StepProfile form={form} errors={errors} update={update} config={currentConfig} />}
 
           {errors.submit && (
             <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 flex items-center gap-2">
@@ -317,7 +345,7 @@ export default function SurveyForm({ interviewerName, onSaved }: SurveyFormProps
                 <button type="button" onClick={nextStep} className="btn-primary flex items-center gap-1.5">Avançar <ChevronRight className="w-4 h-4" /></button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => { setForm(emptyForm); setStep(0); setErrors({}); }} className="btn-secondary flex items-center gap-1.5"><RotateCcw className="w-4 h-4" /> Limpar</button>
+                  <button type="button" onClick={() => { setForm({ ...emptyForm, estado: form.estado, cidade: form.cidade }); setStep(0); setErrors({}); }} className="btn-secondary flex items-center gap-1.5"><RotateCcw className="w-4 h-4" /> Limpar</button>
                   <button type="button" onClick={handleSave} disabled={saving} className="btn-primary bg-emerald-600 hover:bg-emerald-700 flex items-center gap-2">
                     {saving ? 'Salvando com GPS...' : <><Save className="w-4 h-4" /> Salvar Questionário</>}
                   </button>
